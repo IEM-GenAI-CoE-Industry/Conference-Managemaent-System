@@ -1,1 +1,1 @@
-# Conference-Managemaent-System
+# Conference-Management-System
