@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from database import Base, engine
 from auth import router as auth_router
 
-from routers import sponsors_router
+from routers import conferences_router, sessions_router, sponsors_router
 
 
 # ============================================================
@@ -67,18 +67,15 @@ app.include_router(
 # ============================================================
 # OTHER TEAM MODULES
 # ============================================================
-#
-# These will be added after teammates complete
-# their Pull Requests and their routers are merged.
-#
-# Example:
-#
-# from routers import conferences_router
-#
-# app.include_router(
-#     conferences_router.router,
-#     prefix="/conferences",
-#     tags=["Conferences"],
-# )
-#
-# ============================================================
+
+app.include_router(
+    conferences_router.router,
+    prefix="/conferences",
+    tags=["Conferences"],
+)
+
+app.include_router(
+    sessions_router.router,
+    prefix="/sessions",
+    tags=["Sessions"],
+)
