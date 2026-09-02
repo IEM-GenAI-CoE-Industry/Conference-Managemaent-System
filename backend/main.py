@@ -1,21 +1,17 @@
 from fastapi import FastAPI
 
-from database import Base, engine
-from auth import router as auth_router
+from backend.database import Base, engine
+from backend.auth import router as auth_router
+from backend.routers import sponsors_router, resource_forecast_router
 
-from routers import sponsors_router
+# Import models before create_all so SQLAlchemy registers every model
+# that is currently part of the project. Teammate-owned models can be
+# added here automatically when their modules are merged.
+import backend.models  # noqa: F401,E402
 
-
-# ============================================================
-# DATABASE
-# ============================================================
 
 Base.metadata.create_all(bind=engine)
 
-
-# ============================================================
-# APPLICATION
-# ============================================================
 
 app = FastAPI(
     title="Conference Management System",
@@ -24,61 +20,31 @@ app = FastAPI(
 )
 
 
-# ============================================================
-# BASIC ROUTES
-# ============================================================
-
 @app.get("/")
 def home():
-
-    return {
-        "message": "Conference Management System API is running"
-    }
+    return {"message": "Conference Management System API is running"}
 
 
 @app.get("/health")
 def health():
-
-    return {
-        "status": "healthy"
-    }
+    return {"status": "healthy"}
 
 
-# ============================================================
-# AUTHENTICATION
-# ============================================================
-
-app.include_router(
-    auth_router
-)
-
-
-# ============================================================
-# SPONSORS & EXHIBITORS
-# ============================================================
+app.include_router(auth_router)
 
 app.include_router(
     sponsors_router.router,
     prefix="/sponsors",
-    tags=["Sponsors & Exhibitors"],
+    tags=["Sponsors"],
 )
 
+app.include_router(
+    sponsors_router.exhibitor_router,
+    prefix="/exhibitors",
+    tags=["Exhibitors"],
+)
 
-# ============================================================
-# OTHER TEAM MODULES
-# ============================================================
-#
-# These will be added after teammates complete
-# their Pull Requests and their routers are merged.
-#
-# Example:
-#
-# from routers import conferences_router
-#
-# app.include_router(
-#     conferences_router.router,
-#     prefix="/conferences",
-#     tags=["Conferences"],
-# )
-#
-# ============================================================
+app.include_router(resource_forecast_router.router)
+
+# Teammate-owned routers will be included here after their PRs are
+# reviewed and merged into this integration branch.
