@@ -4,6 +4,8 @@ from database import Base, engine
 from auth import router as auth_router
 
 from routers import sponsors_router
+from routers import feedback_router
+from routers import dashboard_router
 
 
 # ============================================================
@@ -82,3 +84,15 @@ app.include_router(
 # )
 #
 # ============================================================
+
+app.include_router(
+    feedback_router.router,
+    prefix="/feedback",
+    tags=["Participant Feedback"],
+)
+
+app.include_router(
+    dashboard_router.router,
+    prefix="/dashboard",
+    tags=["Conference Dashboard"],
+)
