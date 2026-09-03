@@ -2,13 +2,15 @@ from fastapi import FastAPI
 
 from backend.database import Base, engine
 from backend.auth import router as auth_router
-from backend.routers import sponsors_router, resource_forecast_router
+from backend.routers import (
+    conferences_router,
+    sessions_router,
+    sponsors_router,
+    resource_forecast_router,
+)
 
-# Import models before create_all so SQLAlchemy registers every model
-# that is currently part of the project. Teammate-owned models can be
-# added here automatically when their modules are merged.
+# Import models before create_all so SQLAlchemy registers every model.
 import backend.models  # noqa: F401,E402
-
 
 Base.metadata.create_all(bind=engine)
 
@@ -44,7 +46,26 @@ app.include_router(
     tags=["Exhibitors"],
 )
 
-app.include_router(resource_forecast_router.router)
+# ============================================================
+# OTHER TEAM MODULES
+# ============================================================
 
-# Teammate-owned routers will be included here after their PRs are
-# reviewed and merged into this integration branch.
+app.include_router(
+    conferences_router.router,
+    prefix="/conferences",
+    tags=["Conferences"],
+)
+
+app.include_router(
+    sessions_router.router,
+    prefix="/sessions",
+    tags=["Sessions"],
+)
+
+app.include_router(
+    sessions_router.rooms_router,
+    prefix="/rooms",
+    tags=["Rooms"],
+)
+
+app.include_router(resource_forecast_router.router)

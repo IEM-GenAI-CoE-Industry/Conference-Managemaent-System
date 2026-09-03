@@ -126,11 +126,84 @@ class Conference(Base):
         cascade="all, delete-orphan",
     )
 
-    # DO NOT add:
-    # sessions = relationship("Session", ...)
-    #
-    # Pratyusha will add the Session model and the
-    # Conference.sessions relationship in her PR.
+    sessions = relationship(
+        "Session",
+        back_populates="conference",
+        cascade="all, delete-orphan",
+    )
+
+
+# ============================================================
+# SESSION
+# ============================================================
+
+class Session(Base):
+    __tablename__ = "sessions"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    conference_id = Column(
+        Integer,
+        ForeignKey("conferences.id"),
+        nullable=False,
+        index=True,
+    )
+
+    title = Column(
+        String(200),
+        nullable=False,
+    )
+
+    speaker_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=True,
+        index=True,
+    )
+
+    start_time = Column(
+        DateTime,
+        nullable=False,
+    )
+
+    end_time = Column(
+        DateTime,
+        nullable=False,
+    )
+
+    location = Column(
+        String(250),
+        nullable=True,
+    )
+
+    room_capacity = Column(
+        Integer,
+        nullable=False,
+    )
+
+    expected_attendees = Column(
+        Integer,
+        nullable=True,
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+    )
+
+    conference = relationship(
+        "Conference",
+        back_populates="sessions",
+    )
+
+    speaker = relationship(
+        "User",
+        foreign_keys=[speaker_id],
+    )
 
 
 # ============================================================
