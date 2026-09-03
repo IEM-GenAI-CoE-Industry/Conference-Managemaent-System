@@ -61,6 +61,8 @@ def session_to_response(session) -> dict:
         "start_time": session.start_time,
         "end_time": session.end_time,
         "location": session.location,
+        "room_capacity": session.room_capacity,
+        "expected_attendees": session.expected_attendees,
     }
 
 

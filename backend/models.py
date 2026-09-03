@@ -177,6 +177,16 @@ class Session(Base):
         nullable=True,
     )
 
+    room_capacity = Column(
+        Integer,
+        nullable=False,
+    )
+
+    expected_attendees = Column(
+        Integer,
+        nullable=True,
+    )
+
     created_at = Column(
         DateTime,
         default=datetime.utcnow,

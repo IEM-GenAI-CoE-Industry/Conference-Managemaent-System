@@ -79,3 +79,9 @@ app.include_router(
     prefix="/sessions",
     tags=["Sessions"],
 )
+
+app.include_router(
+    sessions_router.rooms_router,
+    prefix="/rooms",
+    tags=["Rooms"],
+)
