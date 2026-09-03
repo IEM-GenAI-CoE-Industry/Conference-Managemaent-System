@@ -1,3 +1,9 @@
 fastapi
 uvicorn[standard]
+<<<<<<< HEAD
 sqlalchemy
+=======
+sqlalchemy
+PyJWT
+email-validator
+>>>>>>> snehansha
