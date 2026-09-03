@@ -5,10 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
-from auth import require_role
-from database import get_db
-import models
-
+from backend.auth import require_role
+from backend.database import get_db
+import backend.models as models
 
 MOCK_CONFERENCE_ID = 1
 MOCK_SESSION_ID = 1
