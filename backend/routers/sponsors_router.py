@@ -10,12 +10,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, EmailStr
 from sqlalchemy.orm import Session
 
-from auth import require_role
-from database import get_db
-import models
+from backend.auth import require_role
+from backend.database import get_db
+import backend.models as models
 
 
 router = APIRouter()
+
+# Separate router for the assignment's /exhibitors/ endpoints.
+# Both routers live in this file because Sponsor/Exhibitor Management is one deliverable.
+exhibitor_router = APIRouter()
 
 
 # -----------------------------------------------------------------------------
@@ -66,7 +70,7 @@ class ExhibitorResponse(BaseModel):
 def add_sponsor(
     payload: SponsorCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role("admin", "organizer")),
+    current_user: models.User = Depends(require_role("organizer")),
 ):
     conference = db.query(models.Conference).filter(
         models.Conference.id == payload.conference_id
@@ -106,15 +110,15 @@ def list_sponsors(conference_id: int, db: Session = Depends(get_db)):
 # EXHIBITORS
 # -----------------------------------------------------------------------------
 
-@router.post(
-    "/exhibitors/",
+@exhibitor_router.post(
+    "/",
     response_model=ExhibitorResponse,
     status_code=status.HTTP_201_CREATED,
 )
 def add_exhibitor(
     payload: ExhibitorCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role("admin", "organizer")),
+    current_user: models.User = Depends(require_role("organizer")),
 ):
     conference = db.query(models.Conference).filter(
         models.Conference.id == payload.conference_id
@@ -135,7 +139,7 @@ def add_exhibitor(
     return exhibitor
 
 
-@router.get("/exhibitors/", response_model=List[ExhibitorResponse])
+@exhibitor_router.get("/", response_model=List[ExhibitorResponse])
 def list_exhibitors(conference_id: int, db: Session = Depends(get_db)):
     return db.query(models.Exhibitor).filter(
         models.Exhibitor.conference_id == conference_id
