@@ -1,23 +1,13 @@
 from datetime import date
 from typing import List, Optional
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
-
 from backend.auth import require_role
 from backend.database import get_db
-import backend.models as models
+from backend import models
 
-MOCK_CONFERENCE_ID = 1
-MOCK_SESSION_ID = 1
-MOCK_USER_ID = 1
-MOCK_SUBMISSION_ID = 1
-MOCK_PAYMENT_ID = 1
-
-
-router = APIRouter()
-
+router = APIRouter(prefix="/conferences", tags=["Conferences"])
 
 class ConferenceCreate(BaseModel):
     name: str
@@ -26,10 +16,8 @@ class ConferenceCreate(BaseModel):
     end_date: date
     location: str
 
-
 class ConferenceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: int
     name: str
     description: Optional[str] = None
@@ -38,122 +26,32 @@ class ConferenceResponse(BaseModel):
     location: Optional[str] = None
     organizer_id: Optional[int] = None
 
+def conference_to_response(c):
+    return {"id": c.id, "name": c.name, "description": c.description, "start_date": c.start_date, "end_date": c.end_date, "location": c.location, "organizer_id": c.organizer_id}
 
-def conference_to_response(conference: models.Conference) -> dict:
-    return {
-        "id": conference.id,
-        "name": conference.name,
-        "description": conference.description,
-        "start_date": conference.start_date,
-        "end_date": conference.end_date,
-        "location": conference.venue,
-        "organizer_id": conference.created_by,
-    }
+def session_to_response(s):
+    return {"id": s.id, "conference_id": s.conference_id, "title": s.title, "speaker_id": s.speaker_id, "speaker_confirmed": s.speaker_confirmed, "start_time": s.start_time, "end_time": s.end_time, "location": s.location, "room_capacity": s.room_capacity, "expected_attendees": s.expected_attendees}
 
-
-def session_to_response(session) -> dict:
-    return {
-        "id": session.id,
-        "conference_id": session.conference_id,
-        "title": session.title,
-        "speaker_id": session.speaker_id,
-        "start_time": session.start_time,
-        "end_time": session.end_time,
-        "location": session.location,
-        "room_capacity": session.room_capacity,
-        "expected_attendees": session.expected_attendees,
-    }
-
-
-def get_session_model():
-    session_model = getattr(models, "Session", None)
-    if session_model is None:
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="Session model is not available in models.py yet.",
-        )
-
-    return session_model
-
-
-@router.post(
-    "/",
-    response_model=ConferenceResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def create_conference(
-    payload: ConferenceCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role("admin", "organizer")),
-):
-    if payload.end_date < payload.start_date:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Conference end date cannot be before start date.",
-        )
-
-    conference = models.Conference(
-        name=payload.name.strip(),
-        description=payload.description,
-        start_date=payload.start_date.isoformat(),
-        end_date=payload.end_date.isoformat(),
-        venue=payload.location.strip(),
-        created_by=current_user.id,
-    )
-
-    db.add(conference)
-    db.commit()
-    db.refresh(conference)
-
+@router.post("/", response_model=ConferenceResponse, status_code=201)
+def create_conference(payload: ConferenceCreate, db: Session = Depends(get_db), current_user=Depends(require_role("organizer"))):
+    if payload.end_date < payload.start_date: raise HTTPException(400, "Conference end date cannot be before start date")
+    conference = models.Conference(title=payload.name.strip(), description=payload.description, start_date=payload.start_date.isoformat(), end_date=payload.end_date.isoformat(), location=payload.location.strip(), organizer_id=current_user.id)
+    db.add(conference); db.commit(); db.refresh(conference)
     return conference_to_response(conference)
-
 
 @router.get("/", response_model=List[ConferenceResponse])
 def list_conferences(db: Session = Depends(get_db)):
-    conferences = db.query(models.Conference).all()
-    return [conference_to_response(conference) for conference in conferences]
-
+    return [conference_to_response(c) for c in db.query(models.Conference).order_by(models.Conference.start_date).all()]
 
 @router.get("/{conference_id}", response_model=ConferenceResponse)
 def get_conference(conference_id: int, db: Session = Depends(get_db)):
-    conference = (
-        db.query(models.Conference)
-        .filter(models.Conference.id == conference_id)
-        .first()
-    )
-
-    if not conference:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Conference not found.",
-        )
-
-    return conference_to_response(conference)
-
+    c = db.query(models.Conference).filter(models.Conference.id == conference_id).first()
+    if not c: raise HTTPException(404, "Conference not found")
+    return conference_to_response(c)
 
 @router.get("/{conference_id}/agenda")
-def get_conference_agenda(conference_id: int, db: Session = Depends(get_db)):
-    conference = (
-        db.query(models.Conference)
-        .filter(models.Conference.id == conference_id)
-        .first()
-    )
-
-    if not conference:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Conference not found.",
-        )
-
-    SessionModel = get_session_model()
-    sessions = (
-        db.query(SessionModel)
-        .filter(SessionModel.conference_id == conference_id)
-        .order_by(SessionModel.start_time)
-        .all()
-    )
-
-    return {
-        "conference": conference_to_response(conference),
-        "sessions": [session_to_response(session) for session in sessions],
-    }
+def agenda(conference_id: int, db: Session = Depends(get_db)):
+    c = db.query(models.Conference).filter(models.Conference.id == conference_id).first()
+    if not c: raise HTTPException(404, "Conference not found")
+    sessions = db.query(models.Session).filter(models.Session.conference_id == conference_id).order_by(models.Session.start_time).all()
+    return {"conference": conference_to_response(c), "sessions": [session_to_response(s) for s in sessions]}

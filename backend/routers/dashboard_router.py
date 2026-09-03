@@ -1,64 +1,40 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
-
-from backend.database import get_db
+from sqlalchemy.orm import Session
 from backend.auth import get_current_user
-from backend.models import User, Conference, Feedback, Review, Submission
+from backend.database import get_db
+from backend.models import Attendance, Conference, Feedback, Payment, Registration, Session as SessionModel, User
 
 router = APIRouter()
 
+def workload_summary(db: Session, conference_id: int):
+    # Swapna's review tables are intentionally not required for this prototype.
+    return {"overloaded": 0, "moderate": 0, "available": 0, "note": "Reviewer workload activates when the review module is merged."}
 
 @router.get("/stats")
-def get_dashboard_stats(
-    conference_id: int,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
-    total_users = db.query(func.count(User.id)).scalar()
-
-    total_conferences = db.query(func.count(Conference.id)).scalar()
-
-    total_feedback = db.query(func.count(Feedback.id)).scalar()
-
-    satisfaction_avg = db.query(func.avg(Feedback.rating)).scalar()
-
-    # Reviewer workload for the selected conference
-    workload_data = db.query(
-        Review.reviewer_id,
-        func.count(Review.id).label("cnt"),
-    ).join(
-        Submission,
-        Review.submission_id == Submission.id
-    ).filter(
-        Submission.conference_id == conference_id
-    ).group_by(
-        Review.reviewer_id
-    ).all()
-
-    overloaded = sum(1 for r in workload_data if r.cnt > 8)
-    moderate = sum(1 for r in workload_data if 5 <= r.cnt <= 8)
-    available = sum(1 for r in workload_data if r.cnt < 5)
-
+def get_dashboard_stats(conference_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not db.query(Conference).filter(Conference.id == conference_id).first():
+        raise HTTPException(404, "Conference not found")
+    registrations = db.query(func.count(Registration.id)).filter(Registration.conference_id == conference_id).scalar() or 0
+    revenue = db.query(func.coalesce(func.sum(Payment.amount), 0)).join(Registration).filter(Registration.conference_id == conference_id, Payment.status == "paid").scalar() or 0
+    total_feedback = db.query(func.count(Feedback.id)).filter(Feedback.conference_id == conference_id).scalar() or 0
+    satisfaction = db.query(func.avg(Feedback.rating)).filter(Feedback.conference_id == conference_id).scalar()
+    total_sessions = db.query(func.count(SessionModel.id)).filter(SessionModel.conference_id == conference_id).scalar() or 0
+    attendance = db.query(func.count(Attendance.id)).join(SessionModel).filter(SessionModel.conference_id == conference_id, Attendance.attended.is_(True)).scalar() or 0
     return {
-        "total_users": total_users,
-        "total_conferences": total_conferences,
-        "total_sessions": "pending - Member B",
-        "total_registrations": "pending - Member C",
-        "total_revenue": "pending - Member C",
-        "total_submissions": "pending - Member D",
-        "submissions_accepted": "pending - Member D",
-        "submissions_rejected": "pending - Member D",
-        "total_certificates": "pending - Member D",
+        "conference_id": conference_id,
+        "total_users": db.query(func.count(User.id)).scalar() or 0,
+        "total_conferences": db.query(func.count(Conference.id)).scalar() or 0,
+        "total_sessions": total_sessions,
+        "total_registrations": registrations,
+        "total_revenue": round(float(revenue), 2),
+        "total_submissions": 0,
+        "submissions_accepted": 0,
+        "submissions_rejected": 0,
+        "total_certificates": 0,
+        "total_attendance_records": attendance,
         "total_feedback": total_feedback,
-        "satisfaction_avg": (
-            round(satisfaction_avg, 2)
-            if satisfaction_avg
-            else None
-        ),
-        "reviewer_workload_summary": {
-            "overloaded": overloaded,
-            "moderate": moderate,
-            "available": available,
-        },
+        "satisfaction_avg": round(float(satisfaction), 2) if satisfaction is not None else None,
+        "reviewer_workload_summary": workload_summary(db, conference_id),
+        "swapna_module_status": "pending integration",
     }
