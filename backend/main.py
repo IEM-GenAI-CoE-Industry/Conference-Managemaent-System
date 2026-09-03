@@ -3,11 +3,11 @@ from database import engine, Base
 import models  # Ensures metadata is bound properly
 # noqa: F401 - import so tables get registered on Base before create_all
 
-import submissions_router
-import reviews_router
-import announcements_router
-import search_router
-import certificates_router
+from routers import reviews_router
+from routers import announcements_router
+from routers import search_router
+from routers import certificates_router
+from routers import submissions_router
 
 Base.metadata.create_all(bind=engine)
 
