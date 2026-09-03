@@ -21,7 +21,10 @@ app.include_router(search_router.router)
 app.include_router(certificates_router.router)
 
 @app.get("/")
-def root():
-    return {"status": "SWAPNA module operational"}
+def home():
+    return {"message": "Backend is running"}
 
 
+@app.get("/health")
+def health():
+    return {"status": "healthy"}

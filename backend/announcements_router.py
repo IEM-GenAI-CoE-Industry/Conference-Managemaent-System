@@ -14,9 +14,6 @@ class AnnouncementCreate(BaseModel):
     conference_id: int = MOCK_CONFERENCE_ID
     title: str
     message: str
-    start_time: str = None  # Optional, can be added later
-    end_time:str = None  # Optional, can be added later
-    speaker: str = None  # Optional, can be added later
     
 
 class AnnouncementOut(BaseModel):
