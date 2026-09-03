@@ -29,6 +29,13 @@ def home():
 def health():
     return {"status": "healthy"}
 
+
+from routers import registrations_router, payments_router, attendance_router, bottleneck_router
+
+app.include_router(registrations_router.router)
+app.include_router(payments_router.router)
+app.include_router(attendance_router.router)
+app.include_router(bottleneck_router.router)
 app.include_router(auth_router)
 
 app.include_router(
