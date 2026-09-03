@@ -1,4 +1,5 @@
 from datetime import datetime
+from datetime import timezone
 
 from sqlalchemy import (
     Column,
@@ -292,3 +293,17 @@ class Exhibitor(Base):
         "Conference",
         back_populates="exhibitors",
     )
+# ============================================================
+# FEEDBACK
+# ============================================================
+
+class Feedback(Base):
+    __tablename__ = "feedback"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("sessions.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    conference_id = Column(Integer, ForeignKey("conferences.id"), nullable=False, index=True)
+    rating = Column(Integer, nullable=False)
+    comments = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
