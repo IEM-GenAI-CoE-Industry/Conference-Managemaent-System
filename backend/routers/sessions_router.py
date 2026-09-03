@@ -5,9 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from auth import require_role
-from database import get_db
-import models
+from backend.auth import require_role
+from backend.database import get_db
+from backend import models
 
 
 MOCK_CONFERENCE_ID = 1
@@ -286,30 +286,30 @@ def room_suggestions(
         elif utilization < 60:
             underutilized_sessions.append(session)    
 
-            for session_a in overcrowded_sessions:
-                for session_b in underutilized_sessions:
+    for session_a in overcrowded_sessions:
+        for session_b in underutilized_sessions:
 
-                    expected_attendees_a = (
-                        session_a.expected_attendees or 0
-                    )
+            expected_attendees_a = (
+                session_a.expected_attendees or 0
+            )
 
-                    if session_b.room_capacity >= expected_attendees_a:
-                        suggestions.append(
-                            {
-                                "session_a_id": session_a.id,
-                                "session_b_id": session_b.id,
-                                "reason": (
-                                    f"Session '{session_a.title}' is overcrowded "
-                                    f"while '{session_b.title}' is underutilized, "
-                                    "and room B has enough capacity."
-                                ),
-                                "suggested_swap": (
-                                    f"Move session {session_a.id} "
-                                    f"to room {session_b.location}"
-                                ),
-                            }
-                        )
-            return suggestions
+            if session_b.room_capacity >= expected_attendees_a:
+                suggestions.append(
+                    {
+                        "session_a_id": session_a.id,
+                        "session_b_id": session_b.id,
+                        "reason": (
+                            f"Session '{session_a.title}' is overcrowded "
+                            f"while '{session_b.title}' is underutilized, "
+                            "and room B has enough capacity."
+                        ),
+                        "suggested_swap": (
+                            f"Move session {session_a.id} "
+                            f"to room {session_b.location}"
+                        ),
+                    }
+                )
+    return suggestions
 
 @router.patch("/{session_id}/room")
 def update_session_room(
