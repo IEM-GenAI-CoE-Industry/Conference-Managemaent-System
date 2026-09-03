@@ -1,7 +1,6 @@
 from datetime import datetime
 
 from sqlalchemy import (
-    Boolean,
     Column,
     DateTime,
     ForeignKey,
@@ -9,9 +8,9 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
 
-from database import Base
+from backend.database import Base
 
 
 # ============================================================
@@ -21,15 +20,13 @@ from database import Base
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True,
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
-    name = Column(
-        String(150),
+    username = Column(
+        String(100),
+        unique=True,
         nullable=False,
+        index=True,
     )
 
     email = Column(
@@ -39,7 +36,7 @@ class User(Base):
         index=True,
     )
 
-    hashed_password = Column(
+    password = Column(
         String(255),
         nullable=False,
     )
@@ -47,18 +44,6 @@ class User(Base):
     role = Column(
         String(50),
         nullable=False,
-        default="participant",
-    )
-
-    is_active = Column(
-        Boolean,
-        nullable=False,
-        default=True,
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
     )
 
 
@@ -75,8 +60,8 @@ class Conference(Base):
         index=True,
     )
 
-    name = Column(
-        String(200),
+    title = Column(
+        String(250),
         nullable=False,
     )
 
@@ -85,10 +70,14 @@ class Conference(Base):
         nullable=True,
     )
 
-    venue = Column(
+    # Main field used by the updated API contract.
+    location = Column(
         String(250),
         nullable=True,
     )
+
+    # Backward-compatible alias for existing code.
+    venue = synonym("location")
 
     start_date = Column(
         String(50),
@@ -100,15 +89,29 @@ class Conference(Base):
         nullable=True,
     )
 
-    created_by = Column(
+    # Main field used by the updated API contract.
+    organizer_id = Column(
         Integer,
         ForeignKey("users.id"),
         nullable=True,
+        index=True,
     )
+
+    # Backward-compatible alias for existing code.
+    created_by = synonym("organizer_id")
 
     created_at = Column(
         DateTime,
         default=datetime.utcnow,
+    )
+
+    # --------------------------------------------------------
+    # Relationships
+    # --------------------------------------------------------
+
+    organizer = relationship(
+        "User",
+        foreign_keys=[organizer_id],
     )
 
     sponsors = relationship(
@@ -121,6 +124,85 @@ class Conference(Base):
         "Exhibitor",
         back_populates="conference",
         cascade="all, delete-orphan",
+    )
+
+    sessions = relationship(
+        "Session",
+        back_populates="conference",
+        cascade="all, delete-orphan",
+    )
+
+
+# ============================================================
+# SESSION
+# ============================================================
+
+class Session(Base):
+    __tablename__ = "sessions"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    conference_id = Column(
+        Integer,
+        ForeignKey("conferences.id"),
+        nullable=False,
+        index=True,
+    )
+
+    title = Column(
+        String(200),
+        nullable=False,
+    )
+
+    speaker_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=True,
+        index=True,
+    )
+
+    start_time = Column(
+        DateTime,
+        nullable=False,
+    )
+
+    end_time = Column(
+        DateTime,
+        nullable=False,
+    )
+
+    location = Column(
+        String(250),
+        nullable=True,
+    )
+
+    room_capacity = Column(
+        Integer,
+        nullable=False,
+    )
+
+    expected_attendees = Column(
+        Integer,
+        nullable=True,
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+    )
+
+    conference = relationship(
+        "Conference",
+        back_populates="sessions",
+    )
+
+    speaker = relationship(
+        "User",
+        foreign_keys=[speaker_id],
     )
 
 
@@ -138,28 +220,13 @@ class Sponsor(Base):
     )
 
     name = Column(
-        String(200),
+        String(250),
         nullable=False,
     )
 
     tier = Column(
         String(50),
-        nullable=True,
-    )
-
-    contact_email = Column(
-        String(255),
-        nullable=True,
-    )
-
-    contact_phone = Column(
-        String(50),
-        nullable=True,
-    )
-
-    website = Column(
-        String(500),
-        nullable=True,
+        nullable=False,
     )
 
     conference_id = Column(
@@ -169,9 +236,19 @@ class Sponsor(Base):
         index=True,
     )
 
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
+    contact_email = Column(
+        String(255),
+        nullable=True,
+    )
+
+    logo_url = Column(
+        String(500),
+        nullable=True,
+    )
+
+    website = Column(
+        String(500),
+        nullable=True,
     )
 
     conference = relationship(
@@ -194,23 +271,8 @@ class Exhibitor(Base):
     )
 
     name = Column(
-        String(200),
+        String(250),
         nullable=False,
-    )
-
-    booth_number = Column(
-        String(50),
-        nullable=True,
-    )
-
-    contact_email = Column(
-        String(255),
-        nullable=True,
-    )
-
-    description = Column(
-        Text,
-        nullable=True,
     )
 
     conference_id = Column(
@@ -220,9 +282,10 @@ class Exhibitor(Base):
         index=True,
     )
 
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
+    # Assignment/API contract uses booth_location.
+    booth_location = Column(
+        String(100),
+        nullable=True,
     )
 
     conference = relationship(
