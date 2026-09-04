@@ -1,3 +1,5 @@
+
+import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, Boolean, Float
@@ -152,3 +154,60 @@ class Feedback(Base):
 
     session = relationship("Session", back_populates="feedback_records")
     user = relationship("User")
+    
+    
+    
+    
+
+
+# ---------------------------------------------------------------------------
+# SUBMISSIONS, REVIEWS, ANNOUNCEMENTS & CERTIFICATES
+# ---------------------------------------------------------------------------
+class Submission(Base):
+    __tablename__ = "submissions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conference_id = Column(Integer, ForeignKey("conferences.id"), nullable=False)
+    author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    title = Column(String(255), nullable=False)
+    abstract = Column(Text, nullable=False)
+    file_url = Column(String(500), nullable=True)
+    status = Column(String(50), default="submitted")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Review(Base):
+    __tablename__ = "reviews"
+
+    id = Column(Integer, primary_key=True, index=True)
+    submission_id = Column(Integer, ForeignKey("submissions.id"), nullable=False)
+    reviewer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    status = Column(String(50), default="assigned")
+    score = Column(Integer, nullable=True)
+    recommendation = Column(String(50), nullable=True)
+    comments = Column(Text, nullable=True)
+    assigned_at = Column(DateTime, default=datetime.utcnow)
+    submitted_at = Column(DateTime, nullable=True)
+
+
+class Announcement(Base):
+    __tablename__ = "announcements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conference_id = Column(Integer, ForeignKey("conferences.id"), nullable=False)
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Certificate(Base):
+    __tablename__ = "certificates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    certificate_uuid = Column(String(36), unique=True, index=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    conference_id = Column(Integer, ForeignKey("conferences.id"), nullable=False)
+    issued_at = Column(DateTime, default=datetime.utcnow)
+
+

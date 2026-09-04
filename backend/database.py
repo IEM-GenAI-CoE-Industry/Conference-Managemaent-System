@@ -6,6 +6,10 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 BASE_DIR = Path(__file__).resolve().parent
 
+
+# Local SQLite database file
+SQLALCHEMY_DATABASE_URL = "sqlite:///./conference_local.db"
+
 DATABASE_URL = f"sqlite:///{BASE_DIR / 'conference.db'}"
 
 
