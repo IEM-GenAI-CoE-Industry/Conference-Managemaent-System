@@ -7,11 +7,11 @@ from backend.routers import conferences_router, sessions_router, sponsors_router
 
 
 
-from routers import reviews_router
-from routers import announcements_router
-from routers import search_router
-from routers import certificates_router
-from routers import submissions_router
+from backend.routers import reviews_router
+from backend.routers import announcements_router
+from backend.routers import search_router
+from backend.routers import certificates_router
+from backend.routers import submissions_router
 
 Base.metadata.create_all(bind=engine)
 
