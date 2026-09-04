@@ -1,6 +1,6 @@
-# Conference Management System — Working Prototype
+# Conference Management System 
 
-This repository contains the backend prototype and a small React demo dashboard. The implementation is aligned with the supplied CMS requirements and team assignment. Swapna's submissions/reviews/announcements/certificates/search work is intentionally **not implemented here** while that work is still in progress.
+This repository contains the backend prototype and a small React demo dashboard. The implementation is aligned with the supplied CMS requirements and team assignment. 
 
 ## Backend demo
 
@@ -54,5 +54,3 @@ Open the Vite URL shown in the terminal. The dashboard logs in with the demo org
 - SQLite is used for the demo so the project runs without PostgreSQL setup.
 - The architecture remains FastAPI + SQLAlchemy + JWT, matching the supplied stack at prototype level.
 - `python -m backend.seed_demo` resets the local SQLite database and creates realistic demo data.
-- Reviewer workload is exposed safely as a placeholder until the submissions/reviews tables are merged.
-- Dashboard submission/certificate counts remain zero until Swapna's module is merged.
