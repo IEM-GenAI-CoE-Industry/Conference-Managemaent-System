@@ -102,3 +102,51 @@ def update_submission_status(
     db.commit()
     db.refresh(submission)
     return submission
+
+
+
+
+# Request schema for camera-ready submission
+class CameraReadyRequest(BaseModel):
+    camera_ready_file_url: str
+    notes: Optional[str] = None
+
+
+@router.post("/{submission_id}/camera-ready")
+def submit_camera_ready(
+    submission_id: int,
+    payload: CameraReadyRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    submission = db.query(Submission).filter(Submission.id == submission_id).first()
+    
+    if not submission:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Submission not found"
+        )
+        
+    # Only callable by the submission author
+    if submission.author_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Only the submission author can submit camera-ready files"
+        )
+        
+    # Only valid if current status == accepted
+    if submission.status != "accepted":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Camera-ready versions can only be submitted for accepted papers"
+        )
+        
+    submission.camera_ready_file_url = payload.camera_ready_file_url
+    if payload.notes:
+        submission.notes = payload.notes
+        
+    submission.status = "camera_ready_submitted"
+    db.commit()
+    db.refresh(submission)
+    
+    return {"message": "Camera-ready submission successful", "submission": submission}
