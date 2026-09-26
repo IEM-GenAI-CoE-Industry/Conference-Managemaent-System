@@ -174,7 +174,8 @@ class Submission(Base):
     file_url = Column(String(500), nullable=True)
     status = Column(String(50), default="submitted")
     created_at = Column(DateTime, default=datetime.utcnow)
-
+    camera_ready_file_url = Column(String(500), nullable=True)
+    notes = Column(Text, nullable=True)
 
 class Review(Base):
     __tablename__ = "reviews"
