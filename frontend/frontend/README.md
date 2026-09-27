@@ -21,7 +21,17 @@ This is the React frontend for the Conference Management System. It provides the
 
 ## Local setup
 
-From the frontend app folder:
+Start the backend first so the auth and API routes are available:
+
+```bash
+cd backend
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python main.py
+```
+
+Then start the frontend from the app folder:
 
 ```bash
 cd frontend/frontend
@@ -34,6 +44,16 @@ The app will run with Vite on the default local development URL, typically:
 ```text
 http://localhost:5173
 ```
+
+### Demo login
+
+Use one of the seeded accounts below:
+
+- organizer@demo.com / demo123
+- participant@demo.com / demo123
+- author@demo.com / demo123
+- reviewer@demo.com / demo123
+- speaker@demo.com / demo123
 
 ## Production build
 
