@@ -4,7 +4,7 @@ import api from "../api";
 type Announcement = {
   id: number;
   title: string;
-  content: string;
+  message: string;
   conference_id: number;
   created_at?: string;
 };
@@ -15,7 +15,7 @@ function AnnouncementsPage() {
 
   const [form, setForm] = useState({
     title: "",
-    content: "",
+    message: "",
     conference_id: "",
   });
 
@@ -56,7 +56,7 @@ function AnnouncementsPage() {
 
       await api.post("/announcements/", {
         title: form.title,
-        content: form.content,
+        message: form.message,
         conference_id: Number(form.conference_id),
       });
 
@@ -64,7 +64,7 @@ function AnnouncementsPage() {
 
       setForm({
         title: "",
-        content: "",
+        message: "",
         conference_id: "",
       });
 
@@ -125,11 +125,11 @@ function AnnouncementsPage() {
             <br />
 
             <textarea
-              value={form.content}
+              value={form.message}
               onChange={(e) =>
                 setForm({
                   ...form,
-                  content: e.target.value,
+                  message: e.target.value,
                 })
               }
               rows={5}
@@ -197,7 +197,7 @@ function AnnouncementsPage() {
               <li key={announcement.id}>
                 <h3>{announcement.title}</h3>
 
-                <p>{announcement.content}</p>
+                <p>{announcement.message}</p>
 
                 <p>
                   <strong>Conference ID:</strong>{" "}

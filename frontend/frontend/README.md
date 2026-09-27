@@ -1,16 +1,61 @@
-# React + Vite
+# Conference Management System Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+This is the React frontend for the Conference Management System. It provides the admin and attendee portal UI for conference operations, registrations, payments, sessions, reviews, search, and reporting.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React 19
+- Vite
+- TypeScript
+- React Router
+- Axios for API calls
 
-## React Compiler
+## Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Authentication and signup flow
+- Dashboard and conference management
+- Session and registration management
+- Payments, attendance, and certificate tracking
+- Search, announcements, feedback, and reporting pages
+- Role-based portal navigation and protected routing
 
-## Expanding the Oxlint configuration
+## Local setup
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+From the frontend app folder:
+
+```bash
+cd frontend/frontend
+npm install
+npm run dev
+```
+
+The app will run with Vite on the default local development URL, typically:
+
+```text
+http://localhost:5173
+```
+
+## Production build
+
+```bash
+cd frontend/frontend
+npm run build
+```
+
+## Project structure
+
+```text
+src/
+  App.tsx
+  Layout.tsx
+  api.ts
+  pages/
+  components/
+  main.tsx
+```
+
+## Notes
+
+- The app expects the backend API to be running and reachable via the configured Axios base URL in `src/api.ts`.
+- Protected screens are gated by a token stored in localStorage.
+- The default route redirects authenticated users to the dashboard.

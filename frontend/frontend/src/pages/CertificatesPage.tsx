@@ -91,7 +91,7 @@ export default function CertificatesPage() {
 
       <div style={styles.card}>
         <h2 style={styles.sectionTitle}>Verify Certificate (Public)</h2>
-        <p style={{ color: '#6b7280', fontSize: 14, marginBottom: 16 }}>No login required — anyone can verify a certificate using its UUID.</p>
+        <p style={{ color: '#6b7280', fontSize: 14, marginBottom: 16 }}>No login required - anyone can verify a certificate using its UUID.</p>
         <form onSubmit={handleVerify} style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
           <div style={{ flex: 1 }}>
             <label style={{ fontSize: 14, display: 'block', marginBottom: 6 }}>Certificate UUID</label>

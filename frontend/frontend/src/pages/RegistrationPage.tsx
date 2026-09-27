@@ -1,4 +1,5 @@
 import { useState } from "react";
+import api from "../api";
 import "./RegistrationPage.css";
 
 interface RegistrationResponse {
@@ -28,40 +29,11 @@ function RegistrationPage() {
     setRegistration(null);
 
     try {
-      const token = localStorage.getItem("token");
-
-      if (!token) {
-        setMessage(
-          "Please login to complete your registration."
-        );
-        setLoading(false);
-        return;
-      }
-
-      const response = await fetch(
-        "http://127.0.0.1:8000/registrations/",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-
-          body: JSON.stringify({
-            conference_id: 1,
-            category: category,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.detail || "Registration failed"
-        );
-      }
+      const response = await api.post("/registrations/", {
+        conference_id: 1,
+        category,
+      });
+      const data = response.data;
 
       setRegistration(data);
 

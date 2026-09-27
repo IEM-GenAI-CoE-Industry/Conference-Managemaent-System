@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-const API = 'http://127.0.0.1:8000';
+import api from '../api';
 
 interface Submission {
   id: number;
@@ -17,18 +16,13 @@ interface Submission {
 export default function OrganizerSubmissionPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [reviewerIds, setReviewerIds] = useState<Record<number, string>>({});
 
   const fetchAllSubmissions = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token') || '';
-      const res = await fetch(`${API}/submissions/`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSubmissions(Array.isArray(data) ? data : []);
-      }
+      const res = await api.get('/submissions/');
+      setSubmissions(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -42,19 +36,25 @@ export default function OrganizerSubmissionPage() {
 
   const handleStatusChange = async (id: number, newStatus: string) => {
     try {
-      const token = localStorage.getItem('token') || '';
-      const res = await fetch(`${API}/submissions/${id}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-      if (!res.ok) throw new Error('Failed to update submission status');
+      await api.patch(`/submissions/${id}/status`, { status: newStatus });
       fetchAllSubmissions();
     } catch (err: any) {
       alert(err.message || 'Error updating status');
+    }
+  };
+
+  const assignReviewer = async (submissionId: number) => {
+    const reviewerId = Number(reviewerIds[submissionId]);
+    if (!Number.isInteger(reviewerId) || reviewerId < 1) {
+      alert('Enter a valid reviewer ID.');
+      return;
+    }
+    try {
+      await api.post('/reviews/assign', { submission_id: submissionId, reviewer_id: reviewerId });
+      await api.patch(`/submissions/${submissionId}/status`, { status: 'under_review' });
+      fetchAllSubmissions();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to assign reviewer');
     }
   };
 
@@ -91,7 +91,7 @@ export default function OrganizerSubmissionPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
           <div>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>
-              Organizer — Submissions Management
+              Organizer - Submissions Management
             </h1>
             <p style={{ color: '#64748B', fontSize: '0.925rem', marginTop: '4px' }}>
               Review paper status, monitor camera-ready uploads, and update decision state.
@@ -134,7 +134,7 @@ export default function OrganizerSubmissionPage() {
                   <th style={{ padding: '14px 20px', fontSize: '0.8125rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>Title</th>
                   <th style={{ padding: '14px 20px', fontSize: '0.8125rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>Author ID</th>
                   <th style={{ padding: '14px 20px', fontSize: '0.8125rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>Status</th>
-                  <th style={{ padding: '14px 20px', fontSize: '0.8125rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>Action</th>
+                  <th style={{ padding: '14px 20px', fontSize: '0.8125rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -172,6 +172,19 @@ export default function OrganizerSubmissionPage() {
                           <option value="camera_ready_submitted">Camera-Ready Submitted</option>
                           <option value="final_accepted">Final Accepted</option>
                         </select>
+                        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                          <input
+                            type="number"
+                            min="1"
+                            value={reviewerIds[sub.id] || ''}
+                            onChange={(e) => setReviewerIds({ ...reviewerIds, [sub.id]: e.target.value })}
+                            placeholder="Reviewer ID"
+                            style={{ width: 96, padding: '6px 8px', border: '1px solid #CBD5E1', borderRadius: 6 }}
+                          />
+                          <button type="button" onClick={() => assignReviewer(sub.id)} style={{ padding: '6px 8px', border: 'none', borderRadius: 6, background: '#0F766E', color: '#fff', cursor: 'pointer' }}>
+                            Assign
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

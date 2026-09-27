@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { SearchBar, SearchType } from "../components/SearchBar";
-
-const API = "http://127.0.0.1:8000";
+import api from "../api";
 
 interface SearchResult {
   id: number | string;
@@ -49,27 +48,10 @@ export function SearchPage() {
       // conference, session, speaker
       const normalizedType = type.toLowerCase();
 
-      const url = `${API}/search?q=${encodeURIComponent(
-        q
-      )}&type=${encodeURIComponent(normalizedType)}`;
-
-      console.log("Search URL:", url);
-
-      const res = await fetch(url);
-
-      if (!res.ok) {
-        console.error(
-          "Search failed:",
-          res.status,
-          await res.text()
-        );
-        setResults([]);
-        return;
-      }
-
-      const data: SearchResponse = await res.json();
-
-      console.log("Search response:", data);
+      const res = await api.get<SearchResponse>("/search/", {
+        params: { q, type: normalizedType },
+      });
+      const data = res.data;
 
       let formattedResults: SearchResult[] = [];
 

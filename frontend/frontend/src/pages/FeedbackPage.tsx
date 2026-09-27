@@ -55,7 +55,7 @@ export default function FeedbackPage() {
             <input type="number" value={sessionId} onChange={e => setSessionId(e.target.value)} required style={styles.input} />
           </div>
           <div style={styles.field}>
-            <label>Rating (1–5 stars)</label>
+            <label>Rating (1-5 stars)</label>
             <div style={{ display: 'flex', gap: 8 }}>
               {[1,2,3,4,5].map(s => (
                 <button key={s} type="button" onClick={() => setRating(s)}
@@ -102,7 +102,7 @@ export default function FeedbackPage() {
                 <tr key={f.id}>
                   <td>{f.session_id}</td>
                   <td>{'★'.repeat(f.rating)}</td>
-                  <td>{f.comments || '—'}</td>
+                  <td>{f.comments || '-'}</td>
                   <td>{new Date(f.created_at).toLocaleDateString()}</td>
                 </tr>
               ))}

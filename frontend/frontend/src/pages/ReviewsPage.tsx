@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-
-const API = 'http://127.0.0.1:8000';
+import api from '../api';
 
 interface Paper {
   submission_id: number;
-  title: string;
-  abstract: string;
+  status: string;
+  title?: string;
+  abstract?: string;
 }
 
 interface Review {
@@ -31,14 +31,8 @@ export function ReviewsPage() {
 
   const fetchAssignedReviews = async () => {
     try {
-      const token = localStorage.getItem('token') || '';
-      const res = await fetch(`${API}/reviews/?reviewer_id=me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAssignedPapers(data);
-      }
+      const res = await api.get('/reviews/mine');
+      setAssignedPapers(res.data);
     } catch (err) {
       console.error(err);
     }
@@ -48,21 +42,12 @@ export function ReviewsPage() {
     e.preventDefault();
     if (!selectedPaper) return;
     try {
-      const token = localStorage.getItem('token') || '';
-      const res = await fetch(`${API}/reviews/submit`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          submission_id: selectedPaper.submission_id,
-          score,
-          recommendation,
-          comments,
-        })
+      await api.post('/reviews/submit', {
+        submission_id: selectedPaper.submission_id,
+        score,
+        recommendation,
+        comments,
       });
-      if (!res.ok) throw new Error('Failed to submit review');
       setMessage('Review submitted successfully!');
       setSelectedPaper(null);
       setComments('');
@@ -74,14 +59,8 @@ export function ReviewsPage() {
   const fetchReviewsForSubmission = async (subId: string) => {
     if (!subId) return;
     try {
-      const token = localStorage.getItem('token') || '';
-      const res = await fetch(`${API}/reviews/?submission_id=${subId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSubmissionReviews(data);
-      }
+      const res = await api.get(`/reviews/?submission_id=${subId}`);
+      setSubmissionReviews(res.data);
     } catch (err) {
       console.error(err);
     }
@@ -144,7 +123,7 @@ export function ReviewsPage() {
                   assignedPapers.map((paper) => (
                     <tr key={paper.submission_id} style={{ borderBottom: '1px solid #E2E8F0' }}>
                       <td style={{ padding: '14px 16px', color: '#0F172A', fontWeight: 600 }}>#{paper.submission_id}</td>
-                      <td style={{ padding: '14px 16px', color: '#0F172A', fontWeight: 500 }}>{paper.title}</td>
+                      <td style={{ padding: '14px 16px', color: '#0F172A', fontWeight: 500 }}>{paper.title || `Submission #${paper.submission_id}`}</td>
                       <td style={{ padding: '14px 16px' }}>
                         <button
                           onClick={() => setSelectedPaper(paper)}
@@ -178,7 +157,7 @@ export function ReviewsPage() {
 
               <form onSubmit={handleReviewSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>Score (1–10):</label>
+                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>Score (1-10):</label>
                   <input
                     type="number"
                     min={1}
@@ -237,7 +216,7 @@ export function ReviewsPage() {
         {/* Bottom Section: Organizer Query Section */}
         <div style={{ backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', padding: '24px' }}>
           <h2 style={{ margin: '0 0 16px 0', fontSize: '1.25rem', color: '#0F172A', fontWeight: 700 }}>
-            Organizer View — Query Submission Reviews
+            Organizer View - Query Submission Reviews
           </h2>
           
           <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', maxWidth: '400px' }}>

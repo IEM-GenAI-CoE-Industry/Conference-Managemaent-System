@@ -25,24 +25,31 @@ export function SearchBar({ onSearch }: SearchBarProps) {
       onSubmit={handleSearch}
       style={{
         display: 'flex',
-        gap: '8px',
+        gap: '10px',
         alignItems: 'center',
         width: '100%',
-        maxWidth: '600px'
+        maxWidth: '700px',
+        padding: '10px 12px',
+        borderRadius: '18px',
+        background: 'rgba(15, 23, 42, 0.7)',
+        border: '1px solid rgba(148, 163, 184, 0.2)',
+        boxShadow: '0 10px 30px rgba(15, 23, 42, 0.32)',
+        backdropFilter: 'blur(10px)'
       }}
     >
       <select
         value={type}
         onChange={(e) => setType(e.target.value as SearchType)}
         style={{
-          padding: '8px 12px',
-          borderRadius: '6px',
-          border: '1px solid #CBD5E1',
+          padding: '10px 12px',
+          borderRadius: '12px',
+          border: '1px solid rgba(148, 163, 184, 0.18)',
           fontSize: '0.875rem',
-          backgroundColor: '#FFFFFF',
+          background: 'rgba(15, 23, 42, 0.85)',
           outline: 'none',
-          color: '#334155',
-          fontWeight: 500
+          color: '#e2e8f0',
+          fontWeight: 700,
+          cursor: 'pointer'
         }}
       >
         <option value="Conference">Conference</option>
@@ -57,27 +64,29 @@ export function SearchBar({ onSearch }: SearchBarProps) {
         onChange={(e) => setQuery(e.target.value)}
         style={{
           flex: 1,
-          padding: '8px 12px',
-          borderRadius: '6px',
-          border: '1px solid #CBD5E1',
-          fontSize: '0.875rem',
+          padding: '11px 14px',
+          borderRadius: '12px',
+          border: '1px solid rgba(148, 163, 184, 0.15)',
+          fontSize: '0.9rem',
           outline: 'none',
-          color: '#0F172A'
+          color: '#f8fafc',
+          background: 'rgba(15, 23, 42, 0.68)'
         }}
       />
 
       <button
         type="submit"
         style={{
-          backgroundColor: '#4F46E5',
+          background: 'linear-gradient(135deg, #38bdf8 0%, #8b5cf6 100%)',
           color: '#FFFFFF',
           border: 'none',
-          borderRadius: '6px',
-          padding: '8px 18px',
-          fontWeight: 600,
+          borderRadius: '12px',
+          padding: '10px 18px',
+          fontWeight: 800,
           fontSize: '0.875rem',
           cursor: 'pointer',
-          whiteSpace: 'nowrap'
+          whiteSpace: 'nowrap',
+          boxShadow: '0 10px 20px rgba(59, 130, 246, 0.25)'
         }}
       >
         Search

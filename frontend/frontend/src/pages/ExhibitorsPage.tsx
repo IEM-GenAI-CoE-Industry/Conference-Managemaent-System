@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import api from "./api";
+import api from "../api";
 
 const CONFERENCE_ID = 1;
 
@@ -153,11 +153,11 @@ export default function ExhibitorsPage() {
                     {ex.booth_location ? (
                       <span style={styles.boothBadge}>{ex.booth_location}</span>
                     ) : (
-                      "—"
+                      "-"
                     )}
                   </td>
                   <td style={{ ...styles.td, color: "#555" }}>
-                    {ex.description ?? "—"}
+                    {ex.description ?? "-"}
                   </td>
                 </tr>
               ))}

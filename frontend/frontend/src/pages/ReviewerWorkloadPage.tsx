@@ -62,7 +62,7 @@ export default function ReviewerWorkloadPage() {
 
         {suggestion && (
           <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: 12, marginBottom: 16 }}>
-            <strong>Suggested Reviewer:</strong> {suggestion.reviewer_name} (ID: {suggestion.recommended_reviewer_id}) — Current load: {suggestion.current_load} papers
+            <strong>Suggested Reviewer:</strong> {suggestion.reviewer_name} (ID: {suggestion.recommended_reviewer_id}) - Current load: {suggestion.current_load} papers
           </div>
         )}
 
