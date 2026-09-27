@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.database import Base, engine
+from backend.database import Base, engine, upgrade_sqlite_schema
 import backend.models  # noqa: F401
 from backend.auth import router as auth_router
 from backend.routers import conferences_router, sessions_router, sponsors_router, resource_forecast_router, feedback_router, dashboard_router, registrations_router, payments_router, attendance_router, bottleneck_router, reviewer_workload_router
@@ -14,6 +14,7 @@ from backend.routers import certificates_router
 from backend.routers import submissions_router
 
 Base.metadata.create_all(bind=engine)
+upgrade_sqlite_schema()
 
 app = FastAPI(title="Conference Management System", version="1.0.0", description="Working prototype for conference lifecycle management")
 app.add_middleware(

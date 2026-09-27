@@ -46,6 +46,19 @@ def run():
     r = client.post("/feedback/", headers=participant, json={"session_id": 1, "rating": 5, "comments": "Excellent"})
     assert r.status_code == 200, r.text
 
+    # Sponsor/exhibitor management rejects blank names before creating a record.
+    r = client.post("/sponsors/", headers=organizer, json={"conference_id": 1, "name": "   ", "tier": "gold"})
+    assert r.status_code == 400, r.text
+
+    r = client.post("/exhibitors/", headers=organizer, json={"conference_id": 1, "name": "   "})
+    assert r.status_code == 400, r.text
+
+    # Forecast configuration is organizer-only and is reflected immediately.
+    r = client.post("/resources/forecast/config?conference_id=1", headers=organizer, json={"attendance_rate_percent": 80})
+    assert r.status_code == 200, r.text
+    r = client.get("/resources/forecast?conference_id=1")
+    assert r.status_code == 200 and r.json()["attendance_rate_percent"] == 80, r.text
+
     print("ALL PROTOTYPE SMOKE TESTS PASSED")
 
 if __name__ == "__main__":

@@ -103,6 +103,19 @@ def submit_review(
     return review
 
 
+@router.get("/mine", response_model=List[ReviewOut])
+def list_my_reviews(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("reviewer")),
+):
+    return (
+        db.query(Review)
+        .filter(Review.reviewer_id == current_user.id)
+        .order_by(Review.id)
+        .all()
+    )
+
+
 @router.get("/", response_model=List[ReviewOut])
 def list_reviews_for_submission(
     submission_id: int,

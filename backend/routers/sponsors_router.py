@@ -79,6 +79,10 @@ def add_sponsor(
     if not conference:
         raise HTTPException(status_code=404, detail="Conference not found.")
 
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Sponsor name is required.")
+
     tier = payload.tier.strip().lower()
     if tier not in {"gold", "silver", "bronze"}:
         raise HTTPException(
@@ -88,7 +92,7 @@ def add_sponsor(
 
     sponsor = models.Sponsor(
         conference_id=payload.conference_id,
-        name=payload.name.strip(),
+        name=name,
         tier=tier,
         contact_email=str(payload.contact_email) if payload.contact_email else None,
         logo_url=payload.logo_url,
@@ -127,9 +131,13 @@ def add_exhibitor(
     if not conference:
         raise HTTPException(status_code=404, detail="Conference not found.")
 
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Exhibitor name is required.")
+
     exhibitor = models.Exhibitor(
         conference_id=payload.conference_id,
-        name=payload.name.strip(),
+        name=name,
         booth_location=payload.booth_location,
         description=payload.description,
     )
