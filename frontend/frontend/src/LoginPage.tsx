@@ -10,11 +10,16 @@ interface LoginResponse {
 
 interface LoginPageProps {
   onLogin: () => void;
+  onSignup: () => void;
 }
 
-function LoginPage({ onLogin }: LoginPageProps) {
+function LoginPage({
+  onLogin,
+  onSignup,
+}: LoginPageProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -28,17 +33,21 @@ function LoginPage({ onLogin }: LoginPageProps) {
     setMessage("");
 
     try {
-      const response = await api.post<LoginResponse>("/auth/login", {
-        email,
-        password,
-      });
+      const response = await api.post<LoginResponse>(
+        "/auth/login",
+        {
+          email,
+          password,
+        }
+      );
 
-      // Save JWT token
-      localStorage.setItem("token", response.data.access_token);
+      localStorage.setItem(
+        "token",
+        response.data.access_token
+      );
 
       setMessage("Login successful!");
 
-      // Tell App.tsx that login is complete
       onLogin();
     } catch (error: unknown) {
       if (
@@ -55,7 +64,8 @@ function LoginPage({ onLogin }: LoginPageProps) {
         };
 
         setMessage(
-          axiosError.response?.data?.detail || "Login failed."
+          axiosError.response?.data?.detail ||
+            "Login failed."
         );
       } else {
         setMessage("Login failed. Please try again.");
@@ -68,7 +78,9 @@ function LoginPage({ onLogin }: LoginPageProps) {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <h1 style={styles.title}>Participant Login</h1>
+        <h1 style={styles.title}>
+          Participant Login
+        </h1>
 
         <p style={styles.subtitle}>
           Login to register for the conference
@@ -108,6 +120,18 @@ function LoginPage({ onLogin }: LoginPageProps) {
             {message}
           </p>
         )}
+
+        <div style={styles.divider}>
+          Don't have an account?
+        </div>
+
+        <button
+          type="button"
+          onClick={onSignup}
+          style={styles.signupButton}
+        >
+          Create Account
+        </button>
       </div>
     </div>
   );
@@ -177,6 +201,26 @@ const styles = {
     textAlign: "center" as const,
     marginTop: "18px",
     color: "#333",
+  },
+
+  divider: {
+    textAlign: "center" as const,
+    marginTop: "25px",
+    color: "#777",
+    fontSize: "14px",
+  },
+
+  signupButton: {
+    width: "100%",
+    marginTop: "10px",
+    padding: "11px",
+    border: "1px solid #1677ff",
+    borderRadius: "8px",
+    background: "#ffffff",
+    color: "#1677ff",
+    fontSize: "15px",
+    fontWeight: 600,
+    cursor: "pointer",
   },
 };
 
