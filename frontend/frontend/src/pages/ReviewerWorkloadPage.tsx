@@ -22,7 +22,7 @@ export default function ReviewerWorkloadPage() {
   async function loadWorkload() {
     try {
       const res = await api.get(`/reviewers/workload?conference_id=${CONFERENCE_ID}`);
-      setWorkload(res.data);
+      setWorkload(res.data.reviewers ?? []);
     } catch (err) {
       setError('Failed to load workload data');
     }

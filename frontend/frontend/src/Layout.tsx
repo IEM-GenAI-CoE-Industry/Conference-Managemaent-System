@@ -1,32 +1,12 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import { SearchBar, type SearchType } from "./components/SearchBar";
-
-const navigation = [
-  ["Dashboard", "/dashboard"],
-  ["Conferences", "/conferences"],
-  ["Sessions", "/sessions"],
-  ["Registrations", "/registrations"],
-  ["Payments", "/payments"],
-  ["Attendance", "/attendance"],
-  ["Submissions", "/submissions"],
-  ["Organizer Submissions", "/organizer/submissions"],
-  ["Content Management", "/content-management"],
-  ["Reviews", "/reviews"],
-  ["Sponsors", "/sponsors"],
-  ["Exhibitors", "/exhibitors"],
-  ["Resource Forecast", "/forecast"],
-  ["Bottleneck Detector", "/bottlenecks"],
-  ["Room Utilization", "/rooms"],
-  ["Reviewer Workload", "/reviewer-workload"],
-  ["Feedback", "/feedback"],
-  ["Announcements", "/announcements"],
-  ["Certificates", "/certificates"],
-  ["Directory Search", "/search"],
-] as const;
+import { type AppRole, navigationItems, routeRoles } from "./access";
 
 export default function Layout() {
   const navigate = useNavigate();
+  const role = localStorage.getItem("role") as AppRole | null;
+  const navigation = navigationItems.filter(([, path]) => routeRoles[path]?.includes(role as AppRole));
 
   const handleSearch = (query: string, type: SearchType) => {
     const parameters = new URLSearchParams({ q: query, type });
@@ -66,8 +46,8 @@ export default function Layout() {
           ))}
         </nav>
 
-        <button type="button" onClick={handleLogout} style={styles.logoutButton}>
-          Log out
+        <button type="button" onClick={handleLogout} style={styles.logoutButton} title="End this session and return to login">
+          Switch account
         </button>
       </aside>
 

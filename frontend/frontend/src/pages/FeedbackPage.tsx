@@ -10,29 +10,43 @@ export default function FeedbackPage() {
   const [feedbackList, setFeedbackList] = useState([]);
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState('');
+  const [summaryError, setSummaryError] = useState('');
   const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
   const role = localStorage.getItem('role');
 
   useEffect(() => { loadFeedback(); }, []);
 
   async function loadFeedback() {
+    setLoading(true);
+    setError('');
+    setSummaryError('');
     try {
       const res = await api.get(`/feedback/?conference_id=${CONFERENCE_ID}`);
-      setFeedbackList(res.data);
-      if (role === 'organizer') {
+      setFeedbackList(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      setError(err.response?.data?.detail || err.message || 'Failed to load feedback');
+      setLoading(false);
+      return;
+    }
+
+    if (role === 'organizer') {
+      try {
         const sum = await api.get(`/feedback/summary?conference_id=${CONFERENCE_ID}`);
         setSummary(sum.data);
+      } catch (err) {
+        setSummary(null);
+        setSummaryError(err.response?.data?.detail || err.message || 'Organizer summary is unavailable.');
       }
-    } catch (err) {
-      setError('Failed to load feedback');
     }
+    setLoading(false);
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError(''); setSuccess('');
     try {
-      await api.post('/feedback/', { session_id: parseInt(sessionId), rating: parseInt(rating), comments });
+      await api.post('/feedback/', { session_id: Number(sessionId), rating, comments });
       setSuccess('Feedback submitted!');
       setComments('');
       loadFeedback();
@@ -48,6 +62,7 @@ export default function FeedbackPage() {
       <div style={styles.card}>
         <h2 style={styles.sectionTitle}>Submit Feedback</h2>
         {error && <div style={styles.error}>{error}</div>}
+        {summaryError && <div style={styles.error}>{summaryError}</div>}
         {success && <div style={styles.success}>{success}</div>}
         <form onSubmit={handleSubmit}>
           <div style={styles.field}>
@@ -93,8 +108,13 @@ export default function FeedbackPage() {
       )}
 
       <div style={styles.card}>
-        <h2 style={styles.sectionTitle}>All Feedback</h2>
-        {feedbackList.length === 0 ? <p style={{ color: '#6b7280' }}>No feedback yet.</p> : (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+          <h2 style={styles.sectionTitle}>All Feedback</h2>
+          <button type="button" onClick={loadFeedback} disabled={loading} style={styles.button}>
+            {loading ? 'Loading...' : 'Refresh'}
+          </button>
+        </div>
+        {error ? <p style={{ color: '#6b7280' }}>Feedback could not be loaded. Check the message above and retry.</p> : loading && feedbackList.length === 0 ? <p style={{ color: '#6b7280' }}>Loading feedback...</p> : feedbackList.length === 0 ? <p style={{ color: '#6b7280' }}>No feedback yet.</p> : (
           <table style={styles.table}>
             <thead><tr><th>Session</th><th>Rating</th><th>Comments</th><th>Date</th></tr></thead>
             <tbody>

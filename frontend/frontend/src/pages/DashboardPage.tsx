@@ -4,13 +4,24 @@ import api from '../api';
 export default function DashboardPage() {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState('');
+  const [role, setRole] = useState<string | null>(localStorage.getItem('role'));
 
   useEffect(() => { loadStats(); }, []);
 
   async function loadStats() {
+    const currentRole = localStorage.getItem('role');
+    setRole(currentRole);
+
+    if (currentRole !== 'organizer') {
+      setStats(null);
+      setError('This dashboard is available to organizers. Use your organizer account to view event reporting and workload metrics.');
+      return;
+    }
+
     try {
       const res = await api.get('/dashboard/stats?conference_id=1');
       setStats(res.data);
+      setError('');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to load dashboard');
     }

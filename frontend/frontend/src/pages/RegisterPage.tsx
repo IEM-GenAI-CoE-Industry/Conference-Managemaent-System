@@ -1,7 +1,7 @@
 import { useState } from "react";
 import api from "../api";
 
-const ROLES = ["organizer", "participant", "author", "reviewer", "speaker"];
+const ROLES = ["participant", "author", "reviewer", "speaker"];
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ name: "", email: "", password: "", role: "participant" });
