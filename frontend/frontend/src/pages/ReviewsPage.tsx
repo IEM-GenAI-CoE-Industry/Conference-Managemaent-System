@@ -16,6 +16,7 @@ interface Review {
 }
 
 export function ReviewsPage() {
+  const isOrganizer = localStorage.getItem('role') === 'organizer';
   const [assignedPapers, setAssignedPapers] = useState<Paper[]>([]);
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
   const [score, setScore] = useState<number>(5);
@@ -26,7 +27,7 @@ export function ReviewsPage() {
   const [searchSubmissionId, setSearchSubmissionId] = useState<string>('');
 
   useEffect(() => {
-    fetchAssignedReviews();
+    if (!isOrganizer) fetchAssignedReviews();
   }, []);
 
   const fetchAssignedReviews = async () => {
@@ -105,7 +106,7 @@ export function ReviewsPage() {
         )}
 
         {/* Top Grid: Assigned Papers + Form Side-by-Side */}
-        <div style={{ display: 'grid', gridTemplateColumns: selectedPaper ? '1fr 1fr' : '1fr', gap: '24px', marginBottom: '40px' }}>
+        {!isOrganizer && <div style={{ display: 'grid', gridTemplateColumns: selectedPaper ? '1fr 1fr' : '1fr', gap: '24px', marginBottom: '40px' }}>
           
           {/* Table Card */}
           <div style={{ backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', padding: '24px' }}>
@@ -211,10 +212,10 @@ export function ReviewsPage() {
               </form>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Bottom Section: Organizer Query Section */}
-        <div style={{ backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', padding: '24px' }}>
+        {isOrganizer && <div style={{ backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', padding: '24px' }}>
           <h2 style={{ margin: '0 0 16px 0', fontSize: '1.25rem', color: '#0F172A', fontWeight: 700 }}>
             Organizer View - Query Submission Reviews
           </h2>
@@ -259,7 +260,7 @@ export function ReviewsPage() {
               </tbody>
             </table>
           )}
-        </div>
+        </div>}
 
       </div>
     </div>

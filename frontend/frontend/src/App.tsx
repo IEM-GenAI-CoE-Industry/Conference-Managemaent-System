@@ -21,11 +21,21 @@ import RoomUtilizationPage from "./pages/RoomUtilizationPage";
 import ReviewerWorkloadPage from "./pages/ReviewerWorkloadPage";
 import PaymentsPage from "./pages/PaymentsPage";
 import AttendancePage from "./pages/AttendancePage";
-import BottleneckPage from "./pages/BottleneckPage";
+import BottleneckPage from "./pages/BottleneckPage.tsx";
 import CertificateVerificationPage from "./pages/CertificateVerificationPage";
+import ProfilePage from "./pages/ProfilePage";
+import { type AppRole, roleHome, routeRoles } from "./access";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return localStorage.getItem("token") ? children : <Navigate replace to="/login" />;
+}
+
+function RoleRoute({ path, children }: { path: string; children: React.ReactNode }) {
+  const role = localStorage.getItem("role");
+  const allowedRoles = routeRoles[path];
+  return allowedRoles?.includes(role as AppRole)
+    ? children
+    : <Navigate replace to={roleHome(role)} />;
 }
 
 export default function App() {
@@ -42,30 +52,31 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/conferences" element={<ConferencesPage />} />
-        <Route path="/sessions" element={<SessionsPage />} />
-        <Route path="/registrations" element={<RegistrationPage />} />
-        <Route path="/payments" element={<PaymentsPage />} />
-        <Route path="/attendance" element={<AttendancePage />} />
-        <Route path="/submissions" element={<SubmissionsPage />} />
-        <Route path="/organizer/submissions" element={<OrganizerSubmissionPage />} />
-        <Route path="/reviews" element={<ReviewsPage />} />
-        <Route path="/sponsors" element={<SponsorsPage />} />
-        <Route path="/exhibitors" element={<ExhibitorsPage />} />
-        <Route path="/forecast" element={<ForecastPage />} />
-        <Route path="/content-management" element={<OrganizerSubmissionPage />} />
-        <Route path="/announcements" element={<AnnouncementsPage />} />
-        <Route path="/certificates" element={<CertificatesPage />} />
-        <Route path="/search" element={<SearchPage />} />
-        <Route path="/feedback" element={<FeedbackPage />} />
-        <Route path="/rooms" element={<RoomUtilizationPage />} />
-        <Route path="/reviewer-workload" element={<ReviewerWorkloadPage />} />
-        <Route path="/bottlenecks" element={<BottleneckPage />} />
+        <Route path="/profile" element={<RoleRoute path="/profile"><ProfilePage /></RoleRoute>} />
+        <Route path="/dashboard" element={<RoleRoute path="/dashboard"><DashboardPage /></RoleRoute>} />
+        <Route path="/conferences" element={<RoleRoute path="/conferences"><ConferencesPage /></RoleRoute>} />
+        <Route path="/sessions" element={<RoleRoute path="/sessions"><SessionsPage /></RoleRoute>} />
+        <Route path="/registrations" element={<RoleRoute path="/registrations"><RegistrationPage /></RoleRoute>} />
+        <Route path="/payments" element={<RoleRoute path="/payments"><PaymentsPage /></RoleRoute>} />
+        <Route path="/attendance" element={<RoleRoute path="/attendance"><AttendancePage /></RoleRoute>} />
+        <Route path="/submissions" element={<RoleRoute path="/submissions"><SubmissionsPage /></RoleRoute>} />
+        <Route path="/organizer/submissions" element={<RoleRoute path="/organizer/submissions"><OrganizerSubmissionPage /></RoleRoute>} />
+        <Route path="/reviews" element={<RoleRoute path="/reviews"><ReviewsPage /></RoleRoute>} />
+        <Route path="/sponsors" element={<RoleRoute path="/sponsors"><SponsorsPage /></RoleRoute>} />
+        <Route path="/exhibitors" element={<RoleRoute path="/exhibitors"><ExhibitorsPage /></RoleRoute>} />
+        <Route path="/forecast" element={<RoleRoute path="/forecast"><ForecastPage /></RoleRoute>} />
+        <Route path="/content-management" element={<RoleRoute path="/content-management"><OrganizerSubmissionPage /></RoleRoute>} />
+        <Route path="/announcements" element={<RoleRoute path="/announcements"><AnnouncementsPage /></RoleRoute>} />
+        <Route path="/certificates" element={<RoleRoute path="/certificates"><CertificatesPage /></RoleRoute>} />
+        <Route path="/search" element={<RoleRoute path="/search"><SearchPage /></RoleRoute>} />
+        <Route path="/feedback" element={<RoleRoute path="/feedback"><FeedbackPage /></RoleRoute>} />
+        <Route path="/rooms" element={<RoleRoute path="/rooms"><RoomUtilizationPage /></RoleRoute>} />
+        <Route path="/reviewer-workload" element={<RoleRoute path="/reviewer-workload"><ReviewerWorkloadPage /></RoleRoute>} />
+        <Route path="/bottlenecks" element={<RoleRoute path="/bottlenecks"><BottleneckPage /></RoleRoute>} />
       </Route>
 
-      <Route path="/" element={<Navigate replace to="/dashboard" />} />
-      <Route path="*" element={<Navigate replace to="/dashboard" />} />
+      <Route path="/" element={<Navigate replace to={localStorage.getItem("token") ? roleHome(localStorage.getItem("role")) : "/login"} />} />
+      <Route path="*" element={<Navigate replace to={localStorage.getItem("token") ? roleHome(localStorage.getItem("role")) : "/login"} />} />
     </Routes>
   );
 }

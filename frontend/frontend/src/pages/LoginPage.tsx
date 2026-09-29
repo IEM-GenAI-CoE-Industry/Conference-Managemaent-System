@@ -1,7 +1,11 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api";
+import { roleHome, roleOptions, type AppRole } from "../access";
 
 export default function LoginPage() {
+  const navigate = useNavigate();
+  const [selectedRole, setSelectedRole] = useState<AppRole | "">("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -9,14 +13,18 @@ export default function LoginPage() {
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!selectedRole) {
+      setError("Choose your account role to continue.");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      const res = await api.post("/auth/login", { email, password });
+      const res = await api.post("/auth/login", { email, password, role: selectedRole });
       localStorage.setItem("token", res.data.access_token);
       localStorage.setItem("role", res.data.role);
       localStorage.setItem("user_id", res.data.user_id);
-      window.location.href = "/dashboard";
+      navigate(roleHome(res.data.role), { replace: true });
     } catch (err: any) {
       setError(err.response?.data?.detail || "Login failed");
     } finally {
@@ -55,6 +63,23 @@ export default function LoginPage() {
           {error && <div style={styles.error}>{error}</div>}
 
           <form onSubmit={handleLogin}>
+            <fieldset style={styles.roleFieldset}>
+              <legend style={styles.label}>Sign in as</legend>
+              <div role="radiogroup" aria-label="Account role" style={styles.roleGrid}>
+                {roleOptions.map((role) => (
+                  <button
+                    key={role.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selectedRole === role.value}
+                    onClick={() => setSelectedRole(role.value)}
+                    style={{ ...styles.roleButton, ...(selectedRole === role.value ? styles.selectedRoleButton : {}) }}
+                  >
+                    {role.label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
             <div style={styles.field}>
               <label style={styles.label}>Email</label>
               <input
@@ -201,6 +226,34 @@ const styles = {
     flexDirection: "column",
     gap: 8,
     marginBottom: 18,
+  },
+  roleFieldset: {
+    border: 0,
+    padding: 0,
+    margin: "0 0 20px",
+  },
+  roleGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: 8,
+    marginTop: 8,
+  },
+  roleButton: {
+    minHeight: 42,
+    padding: "9px 12px",
+    border: "1px solid rgba(148, 163, 184, 0.28)",
+    borderRadius: 8,
+    background: "rgba(15, 23, 42, 0.55)",
+    color: "#cbd5e1",
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  selectedRoleButton: {
+    border: "1px solid #38bdf8",
+    background: "rgba(14, 116, 144, 0.36)",
+    color: "#f0fdfa",
+    boxShadow: "inset 0 0 0 1px rgba(56, 189, 248, 0.2)",
   },
   label: {
     color: "#e2e8f0",
