@@ -29,4 +29,7 @@ def mark_attendance(payload: AttendanceMark, db: Session = Depends(get_db), curr
 
 @router.get("/")
 def get_attendance(session_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return db.query(Attendance).filter(Attendance.session_id == session_id).all()
+    query = db.query(Attendance).filter(Attendance.session_id == session_id)
+    if current_user.role != "organizer":
+        query = query.filter(Attendance.user_id == current_user.id)
+    return query.all()

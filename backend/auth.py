@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Callable
+from typing import Callable, Literal
 import hashlib
 import secrets
 import jwt
@@ -17,6 +17,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+user_directory_router = APIRouter(tags=["Users"])
 security = HTTPBearer()
 
 
@@ -50,11 +51,18 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    role: Literal["organizer", "participant", "author", "reviewer", "speaker"] | None = None
+
+
+class ProfileUpdateRequest(BaseModel):
+    name: str | None = None
+    email: EmailStr | None = None
+    password: str | None = None
 
 
 @router.post("/register", status_code=201)
 def register(data: RegisterRequest, db: Session = Depends(get_db)):
-    allowed_roles = {"organizer", "participant", "author", "reviewer", "speaker"}
+    allowed_roles = {"participant", "author", "reviewer", "speaker"}
     if data.role not in allowed_roles:
         raise HTTPException(400, "Invalid role")
     if db.query(User).filter((User.email == data.email) | (User.username == data.name)).first():
@@ -72,6 +80,8 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     if not user or not verify_password(data.password, user.password):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
+    if data.role is not None and user.role != data.role:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, f"This account is registered as a {user.role}. Select that role to continue.")
     if not user.is_active:
         raise HTTPException(403, "User account is inactive")
     return {"access_token": create_access_token(user.id, user.role), "token_type": "bearer", "user_id": user.id, "role": user.role}
@@ -104,3 +114,55 @@ def require_role(*allowed_roles: str) -> Callable:
             raise HTTPException(403, "You do not have permission")
         return current_user
     return role_checker
+
+
+@router.get("/profile")
+def get_profile(current_user: User = Depends(get_current_user)):
+    return {
+        "id": current_user.id,
+        "name": current_user.name,
+        "email": current_user.email,
+        "role": current_user.role,
+        "is_active": current_user.is_active,
+    }
+
+
+@router.patch("/profile")
+def update_profile(
+    payload: ProfileUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if payload.name is not None:
+        cleaned_name = payload.name.strip()
+        if len(cleaned_name) < 2:
+            raise HTTPException(400, "Name must be at least 2 characters long")
+        if db.query(User).filter(User.username == cleaned_name, User.id != current_user.id).first():
+            raise HTTPException(400, "A user with this name already exists")
+        current_user.username = cleaned_name
+
+    if payload.email is not None:
+        normalized_email = str(payload.email).lower()
+        if db.query(User).filter(User.email == normalized_email, User.id != current_user.id).first():
+            raise HTTPException(400, "A user with this email already exists")
+        current_user.email = normalized_email
+
+    if payload.password is not None:
+        if len(payload.password.strip()) < 6:
+            raise HTTPException(400, "Password must be at least 6 characters long")
+        current_user.password = hash_password(payload.password)
+
+    db.commit(); db.refresh(current_user)
+    return {"id": current_user.id, "name": current_user.name, "email": current_user.email, "role": current_user.role, "is_active": current_user.is_active}
+
+
+@user_directory_router.get("/users/reviewers")
+def list_reviewers(db: Session = Depends(get_db), current_user: User = Depends(require_role("organizer"))):
+    reviewers = db.query(User).filter(User.role == "reviewer").order_by(User.id).all()
+    return [{"id": user.id, "name": user.name, "email": user.email, "role": user.role, "is_active": user.is_active} for user in reviewers]
+
+
+@user_directory_router.get("/users/speakers")
+def list_speakers(db: Session = Depends(get_db), current_user: User = Depends(require_role("organizer"))):
+    speakers = db.query(User).filter(User.role == "speaker").order_by(User.id).all()
+    return [{"id": user.id, "name": user.name, "email": user.email, "role": user.role, "is_active": user.is_active} for user in speakers]
