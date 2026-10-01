@@ -15,6 +15,29 @@ def run():
     organizer = login("organizer@demo.com")
     participant = login("participant@demo.com")
 
+    profile = client.get("/auth/me", headers=participant)
+    assert profile.status_code == 200, profile.text
+    assert profile.json()["email"] == "participant@demo.com"
+
+    updated = client.patch(
+        "/auth/profile",
+        headers=participant,
+        json={"name": "Demo Participant Updated", "email": "participant.updated@demo.com", "password": "newpassword123"},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["name"] == "Demo Participant Updated"
+
+    login_again = client.post("/auth/login", json={"email": "participant.updated@demo.com", "password": "newpassword123"})
+    assert login_again.status_code == 200, login_again.text
+
+    reviewer_dir = client.get("/users/reviewers", headers=organizer)
+    assert reviewer_dir.status_code == 200, reviewer_dir.text
+    assert isinstance(reviewer_dir.json(), list) and len(reviewer_dir.json()) >= 1
+
+    speaker_dir = client.get("/users/speakers", headers=organizer)
+    assert speaker_dir.status_code == 200, speaker_dir.text
+    assert isinstance(speaker_dir.json(), list) and len(speaker_dir.json()) >= 1
+
     checks = [
         ("/auth/me", organizer),
         ("/conferences/", None),

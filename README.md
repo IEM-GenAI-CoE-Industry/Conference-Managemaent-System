@@ -60,8 +60,7 @@ From the repository root:
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-cd backend
-pip install -r requirements.txt
+pip install -r backend\requirements.txt
 ```
 
 Seed the demo database:
@@ -73,7 +72,6 @@ python -m backend.seed_demo
 Start the API server:
 
 ```powershell
-cd ..
 uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -108,10 +106,9 @@ The demo seed creates example accounts for testing:
 
 ## Optional Validation
 
-Run the backend smoke test:
+Run the backend smoke test from the repository root:
 
 ```powershell
-cd backend
 python -m backend.demo_test
 ```
 
