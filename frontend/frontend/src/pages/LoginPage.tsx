@@ -3,6 +3,14 @@ import { useNavigate } from "react-router-dom";
 import api from "../api";
 import { roleHome, roleOptions, type AppRole } from "../access";
 
+const demoAccounts: Record<AppRole, string> = {
+  organizer: "organizer@demo.com",
+  participant: "participant@demo.com",
+  author: "author@demo.com",
+  reviewer: "reviewer@demo.com",
+  speaker: "speaker@demo.com",
+};
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const [selectedRole, setSelectedRole] = useState<AppRole | "">("");
@@ -20,7 +28,11 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await api.post("/auth/login", { email, password, role: selectedRole });
+      const res = await api.post("/auth/login", {
+        email: email.trim().toLowerCase(),
+        password,
+        role: selectedRole,
+      });
       localStorage.setItem("token", res.data.access_token);
       localStorage.setItem("role", res.data.role);
       localStorage.setItem("user_id", res.data.user_id);
@@ -80,6 +92,26 @@ export default function LoginPage() {
                 ))}
               </div>
             </fieldset>
+            <div style={styles.demoAccounts}>
+              <span style={styles.demoHint}>Demo login · password: demo123</span>
+              <div style={styles.demoButtons}>
+                {roleOptions.map((role) => (
+                  <button
+                    key={role.value}
+                    type="button"
+                    style={styles.demoButton}
+                    onClick={() => {
+                      setSelectedRole(role.value);
+                      setEmail(demoAccounts[role.value]);
+                      setPassword("demo123");
+                      setError("");
+                    }}
+                  >
+                    Use {role.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div style={styles.field}>
               <label style={styles.label}>Email</label>
               <input
@@ -237,6 +269,34 @@ const styles = {
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: 8,
     marginTop: 8,
+  },
+  demoAccounts: {
+    marginBottom: 20,
+    padding: 12,
+    borderRadius: 12,
+    background: "rgba(15, 23, 42, 0.5)",
+    border: "1px solid rgba(148, 163, 184, 0.18)",
+  },
+  demoHint: {
+    display: "block",
+    marginBottom: 8,
+    color: "#cbd5e1",
+    fontSize: 12,
+  },
+  demoButtons: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  demoButton: {
+    padding: "6px 9px",
+    border: "1px solid rgba(147, 197, 253, 0.35)",
+    borderRadius: 8,
+    background: "rgba(30, 64, 175, 0.18)",
+    color: "#bfdbfe",
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: "pointer",
   },
   roleButton: {
     minHeight: 42,

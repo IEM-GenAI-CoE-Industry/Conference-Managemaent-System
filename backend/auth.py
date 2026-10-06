@@ -77,7 +77,8 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
 
 @router.post("/login")
 def login(data: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == data.email).first()
+    email = str(data.email).strip().lower()
+    user = db.query(User).filter(User.email == email).first()
     if not user or not verify_password(data.password, user.password):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
     if data.role is not None and user.role != data.role:
