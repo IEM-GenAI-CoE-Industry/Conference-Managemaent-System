@@ -15,6 +15,29 @@ def run():
     organizer = login("organizer@demo.com")
     participant = login("participant@demo.com")
 
+    profile = client.get("/auth/me", headers=participant)
+    assert profile.status_code == 200, profile.text
+    assert profile.json()["email"] == "participant@demo.com"
+
+    updated = client.patch(
+        "/auth/profile",
+        headers=participant,
+        json={"name": "Demo Participant Updated", "email": "participant.updated@demo.com", "password": "newpassword123"},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["name"] == "Demo Participant Updated"
+
+    login_again = client.post("/auth/login", json={"email": "participant.updated@demo.com", "password": "newpassword123"})
+    assert login_again.status_code == 200, login_again.text
+
+    reviewer_dir = client.get("/users/reviewers", headers=organizer)
+    assert reviewer_dir.status_code == 200, reviewer_dir.text
+    assert isinstance(reviewer_dir.json(), list) and len(reviewer_dir.json()) >= 1
+
+    speaker_dir = client.get("/users/speakers", headers=organizer)
+    assert speaker_dir.status_code == 200, speaker_dir.text
+    assert isinstance(speaker_dir.json(), list) and len(speaker_dir.json()) >= 1
+
     checks = [
         ("/auth/me", organizer),
         ("/conferences/", None),
@@ -45,6 +68,19 @@ def run():
 
     r = client.post("/feedback/", headers=participant, json={"session_id": 1, "rating": 5, "comments": "Excellent"})
     assert r.status_code == 200, r.text
+
+    # Sponsor/exhibitor management rejects blank names before creating a record.
+    r = client.post("/sponsors/", headers=organizer, json={"conference_id": 1, "name": "   ", "tier": "gold"})
+    assert r.status_code == 400, r.text
+
+    r = client.post("/exhibitors/", headers=organizer, json={"conference_id": 1, "name": "   "})
+    assert r.status_code == 400, r.text
+
+    # Forecast configuration is organizer-only and is reflected immediately.
+    r = client.post("/resources/forecast/config?conference_id=1", headers=organizer, json={"attendance_rate_percent": 80})
+    assert r.status_code == 200, r.text
+    r = client.get("/resources/forecast?conference_id=1")
+    assert r.status_code == 200 and r.json()["attendance_rate_percent"] == 80, r.text
 
     print("ALL PROTOTYPE SMOKE TESTS PASSED")
 

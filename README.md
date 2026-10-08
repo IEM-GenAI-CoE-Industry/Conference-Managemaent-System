@@ -1,147 +1,124 @@
 # Conference Management System
 
-This repository contains the backend prototype and a small React demo dashboard for the Conference Management System. The implementation is aligned with the supplied CMS requirements and team assignment.
+A full-stack conference lifecycle application for managing conferences, sessions, registrations, payments, attendance, feedback, and event operations. The project combines a FastAPI backend with a React + TypeScript frontend and uses SQLite as the default database for local development.
 
-## Backend Demo
+## Features
 
-From the repository root, create and activate the Python virtual environment and install the backend dependencies:
+- Conference and session management
+- Registration and attendee tracking
+- Payments and participant billing workflows
+- Attendance and feedback collection
+- Sponsor and exhibitor management
+- Review and submission workflows
+- Dashboard and analytics views
+- Bottleneck and resource forecasting
+- Search and certificate-related features
+- JWT-based authentication and role-aware access
 
-```powershell
-cd backend
+## Tech Stack
 
-python -m venv .venv
+- Backend: Python, FastAPI, SQLAlchemy, JWT auth
+- Frontend: React, TypeScript, Vite
+- Database: SQLite
+- API docs: FastAPI Swagger UI / OpenAPI
 
-.venv\Scripts\Activate.ps1
+## Repository Structure
 
-pip install -r requirements.txt
-
-cd ..
+```text
+Conference-Managemaent-System/
+├── backend/
+│   ├── auth.py
+│   ├── database.py
+│   ├── demo_test.py
+│   ├── main.py
+│   ├── models.py
+│   ├── requirements.txt
+│   ├── resource_forecast.py
+│   ├── seed_demo.py
+│   ├── seed_test_data.py
+│   └── routers/
+├── frontend/
+│   └── frontend/
+│       ├── package.json
+│       ├── public/
+│       └── src/
+├── LICENSE
+├── .gitignore
+└── README.md
 ```
 
-Initialize the SQLite database with realistic demo data:
+## Prerequisites
+
+- Python 3.10+ recommended
+- Node.js 18+ and npm
+- Git
+
+## Backend Setup
+
+From the repository root:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r backend\requirements.txt
+```
+
+Seed the demo database:
 
 ```powershell
 python -m backend.seed_demo
 ```
 
-Start the FastAPI backend:
+Start the API server:
 
 ```powershell
-python -m uvicorn backend.main:app --reload
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The API will be available at:
 
-```text
-http://127.0.0.1:8000
+- API: http://localhost:8000
+- Swagger docs: http://localhost:8000/docs
+
+## Frontend Setup
+
+In a separate terminal:
+
+```powershell
+cd frontend\frontend
+npm install
+npm run dev
 ```
 
-### Swagger API Documentation
+The frontend is served by Vite and is typically available at:
 
-Open Swagger UI in your browser:
+- Frontend UI: http://localhost:5173
 
-```text
-http://127.0.0.1:8000/docs
-```
+## Demo Credentials
 
-Swagger UI provides interactive documentation and allows the backend APIs to be tested directly without using the frontend or Postman.
+The demo seed creates example accounts for testing:
 
-The main HTTP methods are:
+- Organizer: organizer@demo.com / demo123
+- Participant: participant@demo.com / demo123
+- Author: author@demo.com / demo123
+- Reviewer: reviewer@demo.com / demo123
+- Speaker: speaker@demo.com / demo123
 
-* **GET** - Retrieve or read data
-* **POST** - Create or submit new data
-* **PUT** - Replace or update an existing resource
-* **PATCH** - Partially update an existing resource
-* **DELETE** - Delete a resource
+## Optional Validation
 
-To test an endpoint in Swagger:
-
-1. Open `/docs`.
-2. Select an API endpoint.
-3. Click **Try it out**.
-4. Enter the required parameters or JSON request body.
-5. Click **Execute**.
-6. Review the response body and HTTP status code.
-
-### Demo Accounts
-
-The demo database contains the following accounts. The demo password is `demo123` for all accounts.
-
-| Role        | Email                   |
-| ----------- | ----------------------- |
-| Organizer   | `organizer@demo.com`    |
-| Participant | `participant@demo.com`  |
-| Author      | `author@demo.com`       |
-| Reviewer    | `reviewer@demo.com`     |
-| Speaker     | `speaker@demo.com`      |
-| Participant | `participant2@demo.com` |
-
-Use the appropriate account when testing role-based API access.
-
-### Example API Testing Flow
-
-A typical backend testing flow is:
-
-1. Start the backend using Uvicorn.
-2. Open Swagger UI at `/docs`.
-3. Test authentication using the demo organizer account.
-4. Test GET endpoints to retrieve existing demo data.
-5. Test POST endpoints using the request schemas displayed by Swagger.
-6. Test PUT/PATCH endpoints where available.
-7. Test DELETE endpoints where appropriate.
-8. Verify the returned HTTP status code and response body.
-
-For example, a POST request may accept a JSON body similar to:
-
-```json
-{
-  "title": "International AI Conference 2026",
-  "description": "Conference on Artificial Intelligence and Machine Learning",
-  "location": "Kolkata",
-  "start_date": "2026-11-15",
-  "end_date": "2026-11-17"
-}
-```
-
-The exact request fields should be taken from the schema displayed by Swagger for the selected endpoint.
-
-### Smoke Test
-
-With the backend running, open another terminal from the repository root and run:
+Run the backend smoke test from the repository root:
 
 ```powershell
 python -m backend.demo_test
 ```
 
-This performs the project's backend smoke tests.
+This checks the main API flows such as login, conferences, dashboard, registrations, payments, and attendance.
 
-## Frontend Demo
+## Notes
 
-In a second terminal:
+- SQLite data is stored locally in the backend directory and is created automatically when the app starts.
+- The app is intended as a working prototype for conference operations management and is suitable for local development and demos.
 
-```powershell
-cd frontend/frontend
+## License
 
-npm install
-
-npm run dev
-```
-
-Open the Vite URL shown in the terminal.
-
-The dashboard logs in with the demo organizer account and displays:
-
-* Registration statistics
-* Revenue
-* Participant satisfaction
-* Resource forecast
-* Bottlenecks
-* Room utilization
-
-## Prototype Notes
-
-* SQLite is used for the demo so the project can run without a PostgreSQL setup.
-* The backend architecture uses FastAPI, SQLAlchemy and JWT authentication, matching the supplied stack at prototype level.
-* `python -m backend.seed_demo` resets the local SQLite database and creates realistic demo data.
-* Swagger UI is automatically generated by FastAPI and is available at `/docs`.
-* The backend can be tested independently of the React frontend using Swagger UI.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

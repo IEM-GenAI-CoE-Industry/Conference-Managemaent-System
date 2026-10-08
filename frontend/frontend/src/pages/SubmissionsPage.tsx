@@ -34,30 +34,13 @@ export function SubmissionsPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<string>('');
 
-  const ensureAuthAndLoad = async () => {
+  const fetchMySubmissions = async () => {
     try {
-      let token = localStorage.getItem('token') ?? '';
+      const token = localStorage.getItem('token') || '';
       if (!token) {
-        const loginRes = await fetch(`${API}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: 'organizer@demo.com', password: 'demo123' })
-        });
-        const loginData = await loginRes.json();
-        if (loginRes.ok && loginData.access_token) {
-          token = loginData.access_token;
-          localStorage.setItem('token', token);
-        }
+        setMessage('Please sign in to view your submissions.');
+        return;
       }
-      fetchMySubmissions(token || undefined);
-    } catch (err: any) {
-      setMessage(`Auth Error: ${err.message}`);
-    }
-  };
-
-  const fetchMySubmissions = async (authToken?: string) => {
-    try {
-      const token = authToken || localStorage.getItem('token') || '';
       const res = await fetch(`${API}/submissions/me`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -74,7 +57,7 @@ export function SubmissionsPage() {
   };
 
   useEffect(() => {
-    ensureAuthAndLoad();
+    fetchMySubmissions();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

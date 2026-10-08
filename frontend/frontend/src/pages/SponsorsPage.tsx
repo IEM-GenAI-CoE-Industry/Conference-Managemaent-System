@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import api from "./api";
+import api from "../api";
 
 const CONFERENCE_ID = 1;
 
@@ -178,7 +178,7 @@ export default function SponsorsPage() {
                       {s.tier.charAt(0).toUpperCase() + s.tier.slice(1)}
                     </span>
                   </td>
-                  <td style={styles.td}>{s.contact_email ?? "—"}</td>
+                  <td style={styles.td}>{s.contact_email ?? "-"}</td>
                 </tr>
               ))}
             </tbody>

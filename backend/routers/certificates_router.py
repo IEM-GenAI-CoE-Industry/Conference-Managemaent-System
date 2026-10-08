@@ -19,9 +19,11 @@ class CertGenerateSchema(BaseModel):
 
 
 class CertOut(BaseModel):
+    id: int
     certificate_uuid: str
     user_id: int
     conference_id: int
+    issued_at: Optional[object] = None
 
     class Config:
         from_attributes = True
