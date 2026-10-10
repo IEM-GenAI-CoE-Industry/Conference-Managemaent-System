@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
 import { roleHome, roleOptions, type AppRole } from "../access";
@@ -19,6 +19,18 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    const existingToken = localStorage.getItem("token");
+    const existingRole = localStorage.getItem("role");
+    if (existingToken && existingRole && roleHome(existingRole) !== "/login") {
+      navigate(roleHome(existingRole), { replace: true });
+    } else {
+      localStorage.removeItem("token");
+      localStorage.removeItem("role");
+      localStorage.removeItem("user_id");
+    }
+  }, [navigate]);
+
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!selectedRole) {
@@ -38,6 +50,9 @@ export default function LoginPage() {
       localStorage.setItem("user_id", res.data.user_id);
       navigate(roleHome(res.data.role), { replace: true });
     } catch (err: any) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("role");
+      localStorage.removeItem("user_id");
       setError(err.response?.data?.detail || "Login failed");
     } finally {
       setLoading(false);
