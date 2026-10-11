@@ -32,6 +32,8 @@ class ReviewOut(BaseModel):
     score: Optional[int]
     recommendation: Optional[str]
     comments: Optional[str]
+    title: Optional[str] = None
+    abstract: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -103,17 +105,39 @@ def submit_review(
     return review
 
 
+
 @router.get("/mine", response_model=List[ReviewOut])
 def list_my_reviews(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("reviewer")),
 ):
-    return (
-        db.query(Review)
+    reviews = (
+        db.query(Review, Submission)
+        .join(Submission, Review.submission_id == Submission.id)
         .filter(Review.reviewer_id == current_user.id)
         .order_by(Review.id)
         .all()
     )
+
+    result = []
+
+    for review, submission in reviews:
+        result.append(
+            ReviewOut(
+                id=review.id,
+                submission_id=review.submission_id,
+                reviewer_id=review.reviewer_id,
+                status=review.status,
+                score=review.score,
+                recommendation=review.recommendation,
+                comments=review.comments,
+                title=submission.title,
+                abstract=submission.abstract,
+            )
+        )
+
+    return result
+
 
 
 @router.get("/", response_model=List[ReviewOut])
