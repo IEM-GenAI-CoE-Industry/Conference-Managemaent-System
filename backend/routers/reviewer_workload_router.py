@@ -97,27 +97,51 @@ def reassign_submission(
     db: Session = Depends(get_db),
     current_user=Depends(require_role("organizer")),
 ):
-    submission = db.query(Submission).filter(Submission.id == submission_id).first()
-    if not submission:
-        raise HTTPException(404, "Submission not found")
-
-    reviewer = (
-        db.query(User)
-        .filter(User.id == reviewer_id, User.role == "reviewer")
+    # Validate submission
+    submission = (
+        db.query(Submission)
+        .filter(Submission.id == submission_id)
         .first()
     )
-    if not reviewer:
-        raise HTTPException(404, "Reviewer not found")
+    if submission is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Submission {submission_id} not found",
+        )
 
+    # Validate that the user exists
+    reviewer = (
+        db.query(User)
+        .filter(User.id == reviewer_id)
+        .first()
+    )
+    if reviewer is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"User {reviewer_id} not found",
+        )
+
+    # Validate that the user is a reviewer
+    if reviewer.role != "reviewer":
+        raise HTTPException(
+            status_code=400,
+            detail=f"User {reviewer_id} is not a reviewer",
+        )
+
+    # Find an existing assignment
     review = (
         db.query(Review)
         .filter(Review.submission_id == submission_id)
         .order_by(Review.id)
         .first()
     )
-    if not review:
-        raise HTTPException(404, "No reviewer assignment exists for this submission")
+    if review is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No review assignment exists for submission {submission_id}",
+        )
 
+    # Reassign and save
     review.reviewer_id = reviewer_id
     db.commit()
     db.refresh(review)
