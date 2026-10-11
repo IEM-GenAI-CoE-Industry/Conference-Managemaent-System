@@ -51,6 +51,7 @@ def _reviewer_loads(db: Session, conference_id: int):
                 "reviewer_name": row.reviewer_name,
                 "assigned_count": int(assignments),
                 "status": status,
+                "expertise": "Not specified",
             }
         )
     return result
@@ -81,13 +82,20 @@ def suggest_reviewer(
         raise HTTPException(404, "No reviewers found")
 
     recommended = min(reviewers, key=lambda item: item["assigned_count"])
+    
     return {
-        "conference_id": conference_id,
-        "recommended_reviewer_id": recommended["reviewer_id"],
-        "reviewer_name": recommended["reviewer_name"],
-        "current_load": recommended["assigned_count"],
-        "status": recommended["status"],
-    }
+    "conference_id": conference_id,
+    "recommended_reviewer_id": recommended["reviewer_id"],
+    "reviewer_name": recommended["reviewer_name"],
+    "current_load": recommended["assigned_count"],
+    "status": recommended["status"],
+    "expertise": recommended["expertise"],
+    "reason": (
+        f"Recommended because this reviewer has the lowest current workload "
+        f"({recommended['assigned_count']} assigned paper(s))."
+    ),
+}
+
 
 
 @submission_router.patch("/{submission_id}/reassign")
