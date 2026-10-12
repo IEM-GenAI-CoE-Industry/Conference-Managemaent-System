@@ -39,6 +39,9 @@ def upgrade_sqlite_schema() -> None:
             "camera_ready_file_url": "VARCHAR(500)",
             "notes": "TEXT",
         },
+        "reviews": {
+        "deadline": "DATETIME",
+        },
     }
 
     with engine.begin() as connection:

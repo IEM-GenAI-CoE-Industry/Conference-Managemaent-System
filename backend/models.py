@@ -188,6 +188,7 @@ class Review(Base):
     recommendation = Column(String(50), nullable=True)
     comments = Column(Text, nullable=True)
     assigned_at = Column(DateTime, default=datetime.utcnow)
+    deadline = Column(DateTime, nullable=True)
     submitted_at = Column(DateTime, nullable=True)
 
 
@@ -212,3 +213,15 @@ class Certificate(Base):
     issued_at = Column(DateTime, default=datetime.utcnow)
 
 
+class ConflictOfInterest(Base):
+    __tablename__ = "conflicts_of_interest"
+
+    id = Column(Integer, primary_key=True, index=True)
+    submission_id = Column(
+        Integer, ForeignKey("submissions.id"), nullable=False
+    )
+    reviewer_id = Column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+    reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

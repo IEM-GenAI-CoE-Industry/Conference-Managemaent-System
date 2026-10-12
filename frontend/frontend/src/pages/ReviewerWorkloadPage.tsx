@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import api from '../api';
 
 const CONFERENCE_ID = 1;
@@ -221,7 +222,7 @@ export default function ReviewerWorkloadPage() {
   );
 }
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   page: {
     padding: 32,
     background: '#f9fafb',
