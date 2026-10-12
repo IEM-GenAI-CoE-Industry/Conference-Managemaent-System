@@ -5,9 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from backend.auth import require_role
+from backend.auth import get_current_user, require_role
 from backend.database import get_db
-from backend.models import ConflictOfInterest, Review, Submission, User
+from backend.models import ConflictOfInterest, Notification, Review, Submission, User
 
 router = APIRouter(prefix="/reviews", tags=["Reviews"])
 
@@ -88,9 +88,21 @@ def assign_reviewer(
         status="assigned",
         deadline=payload.deadline,
     )
+    notification = Notification(
+        user_id=submission.author_id,
+        title="Reviewer Assigned",
+        message=(
+            f"A reviewer has been assigned to your paper "
+            f"'{submission.title}'."
+        ),
+        notification_type="review_assignment",
+    )
+
     db.add(review)
+    db.add(notification)
     db.commit()
     db.refresh(review)
+
     return review
 
 
@@ -220,3 +232,27 @@ def declare_conflict_of_interest(
         "message": "Conflict of interest declared successfully",
         "submission_id": conflict.submission_id,
     }
+
+@router.get("/notifications/mine")
+def get_my_notifications(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    notifications = (
+        db.query(Notification)
+        .filter(Notification.user_id == current_user.id)
+        .order_by(Notification.created_at.desc(), Notification.id.desc())
+        .all()
+    )
+
+    return [
+        {
+            "id": notification.id,
+            "title": notification.title,
+            "message": notification.message,
+            "notification_type": notification.notification_type,
+            "is_read": notification.is_read,
+            "created_at": notification.created_at,
+        }
+        for notification in notifications
+    ]
