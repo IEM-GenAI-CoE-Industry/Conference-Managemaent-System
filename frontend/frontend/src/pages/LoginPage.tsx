@@ -91,7 +91,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={styles.container}>
+    <main style={styles.container}>
       <div style={styles.panel}>
         <div style={styles.heroPanel}>
           <span style={styles.kicker}>Conference Platform</span>
@@ -233,7 +233,7 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -434,10 +434,13 @@ const styles = {
     cursor: "pointer",
     boxShadow: "0 18px 36px rgba(96, 165, 250, 0.28)",
   },
-  disabledButton: {
-    opacity: 0.65,
-    cursor: "not-allowed",
-  },
+  
+disabledButton: {
+  opacity: 0.65,
+  cursor: "not-allowed",
+  filter: "grayscale(25%)",
+},
+
   error: {
     background: "rgba(127, 29, 29, 0.2)",
     border: "1px solid rgba(248, 113, 113, 0.28)",

@@ -67,3 +67,8 @@ h6 {
 ::selection {
   background: rgba(124, 58, 237, 0.4);
 }
+
+input::placeholder {
+  color: #a8b3c7;
+  opacity: 1;
+}
