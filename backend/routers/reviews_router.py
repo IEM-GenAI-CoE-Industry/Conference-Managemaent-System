@@ -115,14 +115,19 @@ def assign_reviewer(
         deadline=payload.deadline,
     )
     notification = Notification(
-        user_id=submission.author_id,
-        title="Reviewer Assigned",
-        message=(
-            f"A reviewer has been assigned to your paper "
-            f"'{submission.title}'."
-        ),
-        notification_type="review_assignment",
-    )
+    user_id=reviewer.id,
+    title="New Paper Assignment",
+    message=(
+        f"You have been assigned to review "
+        f"'{submission.title}'."
+        + (
+            f" Deadline: {payload.deadline.strftime('%Y-%m-%d %H:%M')}."
+            if payload.deadline
+            else ""
+        )
+    ),
+    notification_type="review_assignment",
+)
 
     db.add(review)
     db.add(notification)
