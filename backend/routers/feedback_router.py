@@ -32,8 +32,27 @@ def submit_feedback(data: FeedbackCreate, db: Session=Depends(get_db), current_u
     db.add(f); db.commit(); db.refresh(f); return f
 
 @router.get("/")
-def list_feedback(conference_id:int,db:Session=Depends(get_db)):
-    return db.query(Feedback).filter(Feedback.conference_id==conference_id).all()
+def list_feedback(
+    conference_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    feedback_items = (
+        db.query(Feedback)
+        .filter(Feedback.conference_id == conference_id)
+        .all()
+    )
+
+    return [
+        {
+            "id": item.id,
+            "session_id": item.session_id,
+            "rating": item.rating,
+            "comments": item.comments,
+            "created_at": item.created_at,
+        }
+        for item in feedback_items
+    ]
 
 @router.get("/summary")
 def feedback_summary(conference_id:int,db:Session=Depends(get_db),current_user=Depends(require_role("organizer"))):
