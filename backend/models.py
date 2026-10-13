@@ -177,6 +177,7 @@ class Submission(Base):
     camera_ready_file_url = Column(String(500), nullable=True)
     notes = Column(Text, nullable=True)
 
+
 class Review(Base):
     __tablename__ = "reviews"
 
@@ -190,6 +191,15 @@ class Review(Base):
     assigned_at = Column(DateTime, default=datetime.utcnow)
     deadline = Column(DateTime, nullable=True)
     submitted_at = Column(DateTime, nullable=True)
+
+    # M-26: structured review rubric
+    originality_score = Column(Integer, nullable=True)
+    methodology_score = Column(Integer, nullable=True)
+    clarity_score = Column(Integer, nullable=True)
+    significance_score = Column(Integer, nullable=True)
+    confidence_score = Column(Integer, nullable=True)
+    confidential_comments = Column(Text, nullable=True)
+
 
 
 class Announcement(Base):

@@ -57,8 +57,17 @@ export function ReviewsPage() {
   const [score, setScore] = useState<number>(5);
   const [recommendation, setRecommendation] = useState<string>('Accept');
   const [comments, setComments] = useState<string>('');
+  const [originalityScore, setOriginalityScore] = useState(3);
+  const [methodologyScore, setMethodologyScore] = useState(3);
+  const [clarityScore, setClarityScore] = useState(3);
+  const [significanceScore, setSignificanceScore] = useState(3);
+  const [confidenceScore, setConfidenceScore] = useState(3);
+  const [confidentialComments, setConfidentialComments] = useState('');
   const [message, setMessage] = useState<string>('');
   const [submissionReviews, setSubmissionReviews] = useState<Review[]>([]);
+  const [confidentialReviewComments, setConfidentialReviewComments] = useState<
+  { review_id: number; reviewer_id: number; confidential_comments: string | null }[]
+>([]);
   const [searchSubmissionId, setSearchSubmissionId] = useState<string>('');
 
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -124,15 +133,22 @@ export function ReviewsPage() {
 
     try {
       await api.post('/reviews/submit', {
-        submission_id: selectedPaper.submission_id,
-        score,
-        recommendation,
-        comments,
-      });
+      submission_id: selectedPaper.submission_id,
+      score,
+      recommendation,
+      comments,
+      originality_score: originalityScore,
+      methodology_score: methodologyScore,
+      clarity_score: clarityScore,
+      significance_score: significanceScore,
+      confidence_score: confidenceScore,
+      confidential_comments: confidentialComments,
+    });
 
       setMessage('Review submitted successfully!');
       setSelectedPaper(null);
       setComments('');
+      setConfidentialComments('');
       await fetchAssignedReviews();
     } catch (err: any) {
       setMessage(
@@ -147,28 +163,34 @@ export function ReviewsPage() {
     }
   };
 
-  const fetchReviewsForSubmission = async (subId: string) => {
-    if (!subId || !Number.isInteger(Number(subId)) || Number(subId) <= 0) {
-      setMessage('Enter a valid submission ID.');
-      return;
+ const fetchReviewsForSubmission = async (subId: string) => {
+  if (!subId.trim()) {
+    setMessage('Please enter a submission ID.');
+    return;
+  }
+
+  setMessage('');
+  setSubmissionReviews([]);
+  setConfidentialReviewComments([]);
+
+  try {
+    const res = await api.get(`/reviews/?submission_id=${subId}`);
+    setSubmissionReviews(res.data);
+
+    const confidentialRes = await api.get(
+      `/reviews/confidential/${subId}`
+    );
+    setConfidentialReviewComments(confidentialRes.data);
+
+    if (res.data.length === 0) {
+      setMessage('No reviews found for this submission.');
     }
-
-    setMessage('');
-    setSubmissionReviews([]);
-
-    try {
-      const res = await api.get(`/reviews/?submission_id=${subId}`);
-      setSubmissionReviews(res.data);
-      if (res.data.length === 0) {
-        setMessage('No reviews found for this submission.');
-      }
-    } catch (err: any) {
-      setMessage(
-        err.response?.data?.detail || 'Failed to fetch submission reviews.'
-      );
-    }
-  };
-
+  } catch (err: any) {
+    setMessage(
+      err.response?.data?.detail || 'Failed to fetch submission reviews.'
+    );
+  }
+};
   const declareConflict = async (e: React.FormEvent) => {
     e.preventDefault();
     if (declaringCoi) return;
@@ -596,7 +618,7 @@ export function ReviewsPage() {
                   >
                     <div>
                       <label htmlFor="review-score" style={formLabelStyle}>
-                        Score (1–10):
+                        Score (1–100):
                       </label>
                       <input
                         id="review-score"
@@ -645,6 +667,75 @@ export function ReviewsPage() {
                         }}
                       />
                     </div>
+
+                            {[
+          {
+            label: 'Originality',
+            value: originalityScore,
+            setValue: setOriginalityScore,
+          },
+          {
+            label: 'Methodology',
+            value: methodologyScore,
+            setValue: setMethodologyScore,
+          },
+          {
+            label: 'Clarity',
+            value: clarityScore,
+            setValue: setClarityScore,
+          },
+          {
+            label: 'Significance',
+            value: significanceScore,
+            setValue: setSignificanceScore,
+          },
+          {
+            label: 'Reviewer Confidence',
+            value: confidenceScore,
+            setValue: setConfidenceScore,
+          },
+        ].map((item) => (
+          <div key={item.label}>
+            <label
+              htmlFor={`rubric-${item.label}`}
+              style={formLabelStyle}
+            >
+              {item.label} (1–5):
+            </label>
+            <select
+              id={`rubric-${item.label}`}
+              value={item.value}
+              onChange={(e) => item.setValue(Number(e.target.value))}
+              required
+              style={{
+                ...formInputStyle,
+                backgroundColor: '#FFFFFF',
+              }}
+            >
+              {[1, 2, 3, 4, 5].map((rating) => (
+                <option key={rating} value={rating}>
+                  {rating} {rating === 1 ? '— Poor' : rating === 5 ? '— Excellent' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
+
+            <div>
+              <label htmlFor="confidential-comments" style={formLabelStyle}>
+                Confidential Comments (organizers only):
+              </label>
+              <textarea
+                id="confidential-comments"
+                value={confidentialComments}
+                onChange={(e) => setConfidentialComments(e.target.value)}
+                rows={3}
+                style={{
+                  ...formInputStyle,
+                  resize: 'vertical',
+                }}
+              />
+            </div>
 
                     <div
                       style={{
@@ -844,6 +935,7 @@ export function ReviewsPage() {
                       <th style={tableHeaderStyle}>Score</th>
                       <th style={tableHeaderStyle}>Recommendation</th>
                       <th style={tableHeaderStyle}>Comments</th>
+                      <th style={tableHeaderStyle}>Confidential Comments (Organizer Only)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -853,7 +945,7 @@ export function ReviewsPage() {
                         style={{ borderBottom: '1px solid #E2E8F0' }}
                       >
                         <td style={tableCellStyle}>#{rev.id}</td>
-                        <td style={tableCellStyle}>{rev.score} / 10</td>
+                        <td style={tableCellStyle}>{rev.score} / 100</td>
                         <td style={{ padding: '14px 16px' }}>
                           <span
                             style={getRecommendationBadge(rev.recommendation)}
@@ -868,6 +960,11 @@ export function ReviewsPage() {
                           }}
                         >
                           {rev.comments}
+                        </td>
+                        <td style={tableCellStyle}>
+                          {confidentialReviewComments.find(
+                            (item) => item.review_id === rev.id
+                          )?.confidential_comments || '—'}
                         </td>
                       </tr>
                     ))}

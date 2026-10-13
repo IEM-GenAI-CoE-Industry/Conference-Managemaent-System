@@ -18,11 +18,20 @@ class AssignReviewerSchema(BaseModel):
     deadline: Optional[datetime] = None
 
 
+
 class SubmitReviewSchema(BaseModel):
     submission_id: int
     score: int = Field(ge=0, le=100)
     recommendation: str
     comments: Optional[str] = None
+
+    originality_score: int = Field(ge=1, le=5)
+    methodology_score: int = Field(ge=1, le=5)
+    clarity_score: int = Field(ge=1, le=5)
+    significance_score: int = Field(ge=1, le=5)
+    confidence_score: int = Field(ge=1, le=5)
+    confidential_comments: Optional[str] = None
+
 
 
 class ReviewOut(BaseModel):
@@ -36,6 +45,13 @@ class ReviewOut(BaseModel):
     comments: Optional[str]
     title: Optional[str] = None
     abstract: Optional[str] = None
+
+    originality_score: Optional[int] = None
+    methodology_score: Optional[int] = None
+    clarity_score: Optional[int] = None
+    significance_score: Optional[int] = None
+    confidence_score: Optional[int] = None
+
 
     class Config:
         from_attributes = True
@@ -124,11 +140,21 @@ def submit_review(
     if not review:
         raise HTTPException(404, "Review assignment not found")
 
+
     review.score = payload.score
     review.recommendation = payload.recommendation.strip()
     review.comments = payload.comments
+
+    review.originality_score = payload.originality_score
+    review.methodology_score = payload.methodology_score
+    review.clarity_score = payload.clarity_score
+    review.significance_score = payload.significance_score
+    review.confidence_score = payload.confidence_score
+    review.confidential_comments = payload.confidential_comments
+
     review.status = "completed"
     review.submitted_at = datetime.utcnow()
+
 
     db.commit()
     db.refresh(review)
@@ -185,7 +211,32 @@ def list_reviews_for_submission(
         .all()
     )
 
+@router.get("/confidential/{submission_id}")
+def get_confidential_review_comments(
+    submission_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_role("organizer")),
+):
+    if not db.query(Submission).filter(
+        Submission.id == submission_id
+    ).first():
+        raise HTTPException(404, "Submission not found")
 
+    reviews = (
+        db.query(Review)
+        .filter(Review.submission_id == submission_id)
+        .order_by(Review.id)
+        .all()
+    )
+
+    return [
+        {
+            "review_id": review.id,
+            "reviewer_id": review.reviewer_id,
+            "confidential_comments": review.confidential_comments,
+        }
+        for review in reviews
+    ]
 class COIDeclarationSchema(BaseModel):
     submission_id: int
     reason: Optional[str] = None
