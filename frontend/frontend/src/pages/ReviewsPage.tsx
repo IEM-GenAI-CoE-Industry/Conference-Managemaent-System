@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
 
 interface Paper {
@@ -80,6 +80,8 @@ export function ReviewsPage() {
   const [loadingPapers, setLoadingPapers] = useState<boolean>(false);
   const [submittingReview, setSubmittingReview] = useState<boolean>(false);
   const [declaringCoi, setDeclaringCoi] = useState<boolean>(false);
+  const [draftStatus, setDraftStatus] = useState('');
+  const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!isOrganizer) {
@@ -100,6 +102,50 @@ export function ReviewsPage() {
       setLoadingPapers(false);
     }
   };
+
+
+  useEffect(() => {
+  if (!selectedPaper || isOrganizer || submittingReview) return;
+
+  if (draftTimer.current) clearTimeout(draftTimer.current);
+
+  draftTimer.current = setTimeout(async () => {
+    try {
+      await api.post('/reviews/draft', {
+        submission_id: selectedPaper.submission_id,
+        score,
+        recommendation,
+        comments,
+        originality_score: originalityScore,
+        methodology_score: methodologyScore,
+        clarity_score: clarityScore,
+        significance_score: significanceScore,
+        confidence_score: confidenceScore,
+        confidential_comments: confidentialComments,
+      });
+      setDraftStatus('Draft saved');
+    } catch {
+      setDraftStatus('Draft not saved yet');
+    }
+  }, 1000);
+
+  return () => {
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+  };
+}, [
+  selectedPaper,
+  isOrganizer,
+  submittingReview,
+  score,
+  recommendation,
+  comments,
+  originalityScore,
+  methodologyScore,
+  clarityScore,
+  significanceScore,
+  confidenceScore,
+  confidentialComments,
+]);
 
   const filteredPapers = assignedPapers.filter((paper) => {
     const matchesStatus =
@@ -127,6 +173,9 @@ export function ReviewsPage() {
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPaper || submittingReview) return;
+if (!window.confirm('Are you sure you want to submit this review? You will not be able to edit it afterward.')) {
+  return;
+}
 
     setSubmittingReview(true);
     setMessage('');
@@ -582,6 +631,10 @@ export function ReviewsPage() {
                     {selectedPaper.title ||
                       `Submission #${selectedPaper.submission_id}`}
                   </h3>
+
+                  <p role="status" aria-live="polite" style={{ color: '#475569', fontSize: '0.875rem' }}>
+  {draftStatus}
+</p>
 
                   <p
                     style={{

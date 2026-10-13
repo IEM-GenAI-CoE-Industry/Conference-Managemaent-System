@@ -32,7 +32,17 @@ class SubmitReviewSchema(BaseModel):
     confidence_score: int = Field(ge=1, le=5)
     confidential_comments: Optional[str] = None
 
-
+class SaveReviewDraftSchema(BaseModel):
+    submission_id: int
+    score: Optional[int] = Field(default=None, ge=0, le=100)
+    recommendation: Optional[str] = None
+    comments: Optional[str] = None
+    originality_score: Optional[int] = Field(default=None, ge=1, le=5)
+    methodology_score: Optional[int] = Field(default=None, ge=1, le=5)
+    clarity_score: Optional[int] = Field(default=None, ge=1, le=5)
+    significance_score: Optional[int] = Field(default=None, ge=1, le=5)
+    confidence_score: Optional[int] = Field(default=None, ge=1, le=5)
+    confidential_comments: Optional[str] = None
 
 class ReviewOut(BaseModel):
     id: int
@@ -119,6 +129,46 @@ def assign_reviewer(
     db.commit()
     db.refresh(review)
 
+    return review
+
+@router.post("/draft", response_model=ReviewOut)
+def save_review_draft(
+    payload: SaveReviewDraftSchema,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_role("reviewer")),
+):
+    review = (
+        db.query(Review)
+        .filter(
+            Review.submission_id == payload.submission_id,
+            Review.reviewer_id == current_user.id,
+        )
+        .order_by(Review.id)
+        .first()
+    )
+
+    if not review:
+        raise HTTPException(404, "Review assignment not found")
+
+    if review.status == "completed":
+        raise HTTPException(400, "Completed reviews cannot be saved as drafts")
+
+    review.score = payload.score
+    review.recommendation = (
+        payload.recommendation.strip()
+        if payload.recommendation else None
+    )
+    review.comments = payload.comments
+    review.originality_score = payload.originality_score
+    review.methodology_score = payload.methodology_score
+    review.clarity_score = payload.clarity_score
+    review.significance_score = payload.significance_score
+    review.confidence_score = payload.confidence_score
+    review.confidential_comments = payload.confidential_comments
+    review.status = "draft"
+
+    db.commit()
+    db.refresh(review)
     return review
 
 
@@ -307,3 +357,77 @@ def get_my_notifications(
         }
         for notification in notifications
     ]
+
+@router.post("/{submission_id}/withdraw")
+def withdraw_review(
+    submission_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("reviewer")),
+):
+    review = (
+        db.query(Review)
+        .filter(
+            Review.submission_id == submission_id,
+            Review.reviewer_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not review:
+        raise HTTPException(status_code=404, detail="Review assignment not found")
+
+    if review.status == "completed":
+        raise HTTPException(
+            status_code=400,
+            detail="A submitted review cannot be withdrawn here.",
+        )
+
+    review.status = "assigned"
+    review.score = None
+    review.recommendation = None
+    review.comments = None
+    review.originality_score = None
+    review.methodology_score = None
+    review.clarity_score = None
+    review.significance_score = None
+    review.confidence_score = None
+    review.confidential_comments = None
+
+    db.commit()
+    return {"message": "Draft withdrawn; assignment remains available."}
+
+
+@router.get("/{submission_id}/draft")
+def get_review_draft(
+    submission_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("reviewer")),
+):
+    review = (
+        db.query(Review)
+        .filter(
+            Review.submission_id == submission_id,
+            Review.reviewer_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not review:
+        raise HTTPException(status_code=404, detail="Review assignment not found")
+
+    if review.status == "completed":
+        raise HTTPException(status_code=400, detail="Review is already submitted")
+
+    return {
+        "submission_id": review.submission_id,
+        "score": review.score,
+        "recommendation": review.recommendation,
+        "comments": review.comments,
+        "originality_score": review.originality_score,
+        "methodology_score": review.methodology_score,
+        "clarity_score": review.clarity_score,
+        "significance_score": review.significance_score,
+        "confidence_score": review.confidence_score,
+        "confidential_comments": review.confidential_comments,
+        "status": review.status,
+    }
