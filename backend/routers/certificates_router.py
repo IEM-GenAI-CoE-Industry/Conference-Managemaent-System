@@ -113,3 +113,41 @@ def get_my_certificates(
         .filter(Certificate.user_id == current_user.id)
         .all()
     )
+
+
+@router.get("/preview/{conference_id}")
+def preview_certificate(
+    conference_id: int,
+    user_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_role("organizer")),
+):
+    conference = db.query(Conference).filter(
+        Conference.id == conference_id
+    ).first()
+
+    if not conference:
+        raise HTTPException(status_code=404, detail="Conference not found")
+
+    target_user_id = user_id or current_user.id
+    user = db.query(User).filter(User.id == target_user_id).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "preview": True,
+        "template": "conference_participation",
+        "recipient_name": (
+            getattr(user, "name", None)
+            or getattr(user, "full_name", None)
+            or getattr(user, "email", "Participant")
+        ),
+        "conference_name": (
+            getattr(conference, "name", None)
+            or getattr(conference, "title", None)
+            or f"Conference {conference.id}"
+        ),
+        "certificate_text": "Certificate of Participation",
+        "status": "Preview only — certificate has not been issued",
+    }
