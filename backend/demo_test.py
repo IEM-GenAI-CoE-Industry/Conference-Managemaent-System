@@ -29,6 +29,7 @@ def run():
 
     login_again = client.post("/auth/login", json={"email": "participant.updated@demo.com", "password": "newpassword123"})
     assert login_again.status_code == 200, login_again.text
+    updated_participant = {"Authorization": f"Bearer {login_again.json()['access_token']}"}
 
     reviewer_dir = client.get("/users/reviewers", headers=organizer)
     assert reviewer_dir.status_code == 200, reviewer_dir.text
@@ -81,6 +82,14 @@ def run():
     assert r.status_code == 200, r.text
     r = client.get("/resources/forecast?conference_id=1")
     assert r.status_code == 200 and r.json()["attendance_rate_percent"] == 80, r.text
+
+    # Leave the documented demo login exactly as it was found.
+    restored = client.patch(
+        "/auth/profile",
+        headers=updated_participant,
+        json={"name": "Demo Participant", "email": "participant@demo.com", "password": "demo123"},
+    )
+    assert restored.status_code == 200, restored.text
 
     print("ALL PROTOTYPE SMOKE TESTS PASSED")
 
