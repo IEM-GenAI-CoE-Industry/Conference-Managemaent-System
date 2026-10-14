@@ -120,7 +120,13 @@ class Payment(Base):
     registration_id = Column(Integer, ForeignKey("registrations.id"), nullable=False, unique=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     amount = Column(Float, nullable=False)
+    currency = Column(String(3), nullable=False, default="INR")
+    provider = Column(String(40), nullable=False, default="college_demo_gateway")
+    gateway_order_id = Column(String(80), unique=True, nullable=True, index=True)
+    gateway_payment_id = Column(String(80), unique=True, nullable=True, index=True)
     status = Column(String(30), nullable=False, default="pending")
+    failure_reason = Column(String(250), nullable=True)
+    refunded_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utcnow)
     confirmed_at = Column(DateTime, nullable=True)
 

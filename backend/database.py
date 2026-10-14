@@ -49,6 +49,14 @@ def upgrade_sqlite_schema() -> None:
             "confidence_score": "INTEGER",
             "confidential_comments": "TEXT",
         },
+        "payments": {
+            "currency": "VARCHAR(3) NOT NULL DEFAULT 'INR'",
+            "provider": "VARCHAR(40) NOT NULL DEFAULT 'college_demo_gateway'",
+            "gateway_order_id": "VARCHAR(80)",
+            "gateway_payment_id": "VARCHAR(80)",
+            "failure_reason": "VARCHAR(250)",
+            "refunded_at": "DATETIME",
+        },
 
     }
 
