@@ -1,4 +1,10 @@
 from typing import List, Optional
+from io import BytesIO
+
+from fastapi.responses import StreamingResponse
+from reportlab.lib.pagesizes import landscape, A4
+from reportlab.lib import colors
+from reportlab.pdfgen import canvas
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -112,4 +118,145 @@ def get_my_certificates(
         db.query(Certificate)
         .filter(Certificate.user_id == current_user.id)
         .all()
+    )
+
+
+@router.get("/preview/{conference_id}")
+def preview_certificate(
+    conference_id: int,
+    user_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_role("organizer")),
+):
+    conference = db.query(Conference).filter(
+        Conference.id == conference_id
+    ).first()
+
+    if not conference:
+        raise HTTPException(status_code=404, detail="Conference not found")
+
+    target_user_id = user_id or current_user.id
+    user = db.query(User).filter(User.id == target_user_id).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "preview": True,
+        "template": "conference_participation",
+        "recipient_name": (
+            getattr(user, "name", None)
+            or getattr(user, "full_name", None)
+            or getattr(user, "email", "Participant")
+        ),
+        "conference_name": (
+            getattr(conference, "name", None)
+            or getattr(conference, "title", None)
+            or f"Conference {conference.id}"
+        ),
+        "certificate_text": "Certificate of Participation",
+        "status": "Preview only — certificate has not been issued",
+    }
+
+
+@router.get("/pdf/{cert_uuid}")
+def download_certificate_pdf(
+    cert_uuid: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    cert = (
+        db.query(Certificate)
+        .filter(Certificate.certificate_uuid == cert_uuid)
+        .first()
+    )
+    if not cert:
+        raise HTTPException(status_code=404, detail="Certificate not found")
+
+    # Participants can download only their own certificates.
+    # Organizers can download certificates for any user.
+    if (
+        current_user.role != "organizer"
+        and cert.user_id != current_user.id
+    ):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    user = db.query(User).filter(User.id == cert.user_id).first()
+    conference = (
+        db.query(Conference)
+        .filter(Conference.id == cert.conference_id)
+        .first()
+    )
+
+    if not user or not conference:
+        raise HTTPException(
+            status_code=404,
+            detail="Certificate recipient or conference not found",
+        )
+
+    recipient_name = (
+        getattr(user, "name", None)
+        or getattr(user, "full_name", None)
+        or getattr(user, "email", None)
+        or f"Participant {user.id}"
+    )
+    conference_name = (
+        getattr(conference, "name", None)
+        or getattr(conference, "title", None)
+        or f"Conference {conference.id}"
+    )
+
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=landscape(A4))
+    width, height = landscape(A4)
+
+    # Certificate border and heading
+    pdf.setStrokeColor(colors.HexColor("#24476B"))
+    pdf.setLineWidth(4)
+    pdf.rect(30, 30, width - 60, height - 60)
+
+    pdf.setFillColor(colors.HexColor("#24476B"))
+    pdf.setFont("Helvetica-Bold", 27)
+    pdf.drawCentredString(width / 2, height - 115, "CERTIFICATE OF PARTICIPATION")
+
+    pdf.setFillColor(colors.black)
+    pdf.setFont("Helvetica", 16)
+    pdf.drawCentredString(width / 2, height - 170, "This certificate is presented to")
+
+    pdf.setFillColor(colors.HexColor("#24476B"))
+    pdf.setFont("Helvetica-Bold", 24)
+    pdf.drawCentredString(width / 2, height - 220, str(recipient_name)[:100])
+
+    pdf.setFillColor(colors.black)
+    pdf.setFont("Helvetica", 14)
+    pdf.drawCentredString(width / 2, height - 265, "for participating in")
+
+    pdf.setFont("Helvetica-Bold", 19)
+    pdf.drawCentredString(width / 2, height - 300, str(conference_name)[:120])
+
+    pdf.setFont("Helvetica", 10)
+    pdf.drawCentredString(
+        width / 2,
+        75,
+        f"Certificate ID: {cert.certificate_uuid}",
+    )
+
+    if cert.issued_at:
+        pdf.drawCentredString(
+            width / 2,
+            58,
+            f"Issued: {cert.issued_at.strftime('%d %B %Y')}",
+        )
+
+    pdf.save()
+    buffer.seek(0)
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="certificate-{cert.certificate_uuid}.pdf"'
+            )
+        },
     )
