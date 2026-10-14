@@ -25,41 +25,39 @@
 .landing-brand {
   display: inline-flex;
   align-items: center;
-  gap: 13px;
+  gap: 12px;
   color: inherit;
   text-decoration: none;
 }
 
-.landing-brand-mark {
-  width: 46px;
-  height: 46px;
-  display: grid;
-  place-items: center;
-  border-radius: 15px;
-  color: white;
-  background: linear-gradient(145deg, #302b69, #7866df);
-  box-shadow: 0 9px 24px rgba(91, 75, 190, 0.23);
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+.landing-brand-logo {
+  display: block;
+  flex: 0 0 100px;
+  width: 100px;
+  height: 62px;
+  object-fit: cover;
+  object-position: center 46%;
+  mix-blend-mode: multiply;
 }
 
 .landing-brand-name {
   display: grid;
-  gap: 3px;
+  flex: 0 0 auto;
+  gap: 4px;
 }
 
 .landing-brand-name strong {
-  font-size: 13px;
+  white-space: nowrap;
+  color: #171b2d;
+  font-size: 14px;
   font-weight: 800;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.035em;
 }
 
 .landing-brand-name small {
-  color: var(--landing-muted);
-  font-size: 11px;
-  font-weight: 600;
+  color: #72778a;
+  font-size: 12px;
+  font-weight: 400;
   letter-spacing: 0.025em;
 }
 
@@ -373,29 +371,24 @@
   }
 
   .landing-brand {
-    gap: 9px;
+    gap: 6px;
   }
 
-  .landing-brand-mark {
-    width: 40px;
-    height: 40px;
-    border-radius: 13px;
-    font-size: 11px;
+  .landing-brand-logo {
+    flex-basis: 66px;
+    width: 66px;
+    height: 48px;
   }
 
   .landing-brand-name strong {
-    max-width: 190px;
-    font-size: 10px;
-  }
-
-  .landing-brand-name small {
     font-size: 9px;
   }
 
   .landing-sign-in-header {
     min-height: 39px;
-    padding: 0 13px;
-    font-size: 11px;
+    gap: 7px;
+    padding: 0 10px;
+    font-size: 10px;
   }
 
   .landing-hero {

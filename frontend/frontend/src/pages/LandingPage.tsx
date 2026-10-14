@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import iemLogo from "../assets/iem-logo.png";
 import "./LandingPage.css";
 
 export default function LandingPage() {
@@ -6,10 +7,9 @@ export default function LandingPage() {
     <main className="landing-page">
       <header className="landing-header">
         <Link className="landing-brand" to="/" aria-label="IEM Conference home">
-          <span className="landing-brand-mark" aria-hidden="true">IEM</span>
+          <img className="landing-brand-logo" src={iemLogo} alt="Institute of Engineering & Management" />
           <span className="landing-brand-name">
-            <strong>Institute of Engineering &amp; Management</strong>
-            <small>Conference Management System</small>
+            <strong>Conference Management System</strong>
           </span>
         </Link>
 
