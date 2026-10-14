@@ -1,42 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import api from "../api";
 
-type Attendance = { id: number; user_id: number; session_id: number; attended: boolean };
-export default function AttendancePage() {
-  const isOrganizer = localStorage.getItem("role") === "organizer";
-  const [userId, setUserId] = useState(""); const [sessionId, setSessionId] = useState(""); const [records, setRecords] = useState<Attendance[]>([]); const [message, setMessage] = useState("");
-  const load = async () => { try { setRecords((await api.get<Attendance[]>("/attendance/", { params: { session_id: Number(sessionId) } })).data); } catch (error: any) { setMessage(error.response?.data?.detail || "Unable to load attendance."); } };
-  const mark = async (event: React.FormEvent) => { event.preventDefault(); try { await api.post("/attendance/mark", { user_id: Number(userId), session_id: Number(sessionId), attended: true }); setMessage("Attendance marked."); load(); } catch (error: any) { setMessage(error.response?.data?.detail || "Unable to mark attendance."); } };
-  return (
-    <main style={styles.page}>
-      <header style={styles.header}><p style={styles.eyebrow}>Check-in</p><h1 style={styles.title}>Attendance</h1></header>
-      {message && <p role="status" style={styles.message}>{message}</p>}
-      <section style={styles.section}>
-        <form onSubmit={mark} style={styles.form}>
-          {isOrganizer && <label style={styles.label}>Participant user ID<input required type="number" min="1" placeholder="e.g. 5" value={userId} onChange={(e) => setUserId(e.target.value)} style={styles.input} /></label>}
-          <label style={styles.label}>Session ID<input required type="number" min="1" placeholder="e.g. 2" value={sessionId} onChange={(e) => setSessionId(e.target.value)} style={styles.input} /></label>
-          <div style={styles.actions}>{isOrganizer && <button style={styles.button}>Mark Attended</button>}<button type="button" onClick={load} disabled={!sessionId} style={styles.secondaryButton}>View Session Attendance</button></div>
-        </form>
-      </section>
-      {records.length > 0 && <section style={styles.section}><h2 style={styles.sectionTitle}>Session Attendance</h2><ul style={styles.list}>{records.map((record) => <li key={record.id} style={styles.listItem}><strong>User #{record.user_id}</strong><span style={{ color: record.attended ? "#86efac" : "#fca5a5" }}>{record.attended ? "Attended" : "Not attended"}</span></li>)}</ul></section>}
-    </main>
-  );
-}
+type Session = {id:number;title:string;start_time:string;location?:string;check_in_code?:string};
+type Attendee = {id:number;name:string;email:string;role:string};
+type Record = {id:number;user_id:number;session_id:number;attended:boolean};
 
-const styles: Record<string, React.CSSProperties> = {
-  page: { width: "100%", maxWidth: 1000, margin: "0 auto", padding: "12px 0 40px" },
-  header: { marginBottom: 24 },
-  eyebrow: { margin: "0 0 6px", color: "#67e8f9", fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em" },
-  title: { margin: 0, color: "#f8fafc", fontSize: 34 },
-  section: { marginTop: 18, padding: 24, border: "1px solid rgba(148,163,184,0.2)", borderRadius: 14, background: "linear-gradient(145deg, rgba(15,23,42,0.96), rgba(30,41,59,0.88))" },
-  form: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 18 },
-  label: { display: "grid", gap: 8, color: "#dbeafe", fontWeight: 700, fontSize: 14 },
-  input: { width: "100%", minHeight: 52, padding: "12px 14px", color: "#f8fafc", background: "#0b1220", border: "1px solid #475569", borderRadius: 8, fontSize: 16, boxSizing: "border-box" },
-  actions: { gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", gap: 12 },
-  button: { minHeight: 50, padding: "12px 18px", border: 0, borderRadius: 8, background: "#0e7490", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer" },
-  secondaryButton: { minHeight: 50, padding: "12px 18px", border: "1px solid #64748b", borderRadius: 8, background: "#1e293b", color: "#f8fafc", fontSize: 15, fontWeight: 700, cursor: "pointer" },
-  message: { padding: "12px 16px", color: "#fef3c7", background: "rgba(146,64,14,0.24)", border: "1px solid rgba(251,191,36,0.25)", borderRadius: 8 },
-  sectionTitle: { color: "#f8fafc", margin: "0 0 14px" },
-  list: { display: "grid", gap: 8, listStyle: "none", margin: 0, padding: 0 },
-  listItem: { display: "flex", justifyContent: "space-between", gap: 16, padding: 14, color: "#e2e8f0", background: "rgba(2,6,23,0.38)", borderRadius: 8 },
-};
+export default function AttendancePage(){
+  const organizer=localStorage.getItem("role")==="organizer"; const [sessions,setSessions]=useState<Session[]>([]); const [attendees,setAttendees]=useState<Attendee[]>([]); const [session,setSession]=useState(""); const [attendee,setAttendee]=useState(""); const [code,setCode]=useState(""); const [records,setRecords]=useState<Record[]>([]); const [message,setMessage]=useState("");
+  useEffect(()=>{api.get("/attendance/options").then(r=>{setSessions(r.data.sessions);setAttendees(r.data.attendees||[]);if(r.data.sessions[0])setSession(String(r.data.sessions[0].id));if(r.data.attendees?.[0])setAttendee(String(r.data.attendees[0].id));}).catch(e=>setMessage(e.response?.data?.detail||"Could not load attendance options."));},[]);
+  const mark=async()=>{try{await api.post("/attendance/mark",{user_id:Number(attendee),session_id:Number(session),attended:true});setMessage("Attendance recorded and saved.");await view();}catch(e:any){setMessage(e.response?.data?.detail||"Attendance could not be recorded.");}};
+  const checkIn=async(e:React.FormEvent)=>{e.preventDefault();try{await api.post("/attendance/check-in",{code});setMessage("You are checked in. Your attendance is saved.");}catch(x:any){setMessage(x.response?.data?.detail||"Check-in failed.");}};
+  const view=async()=>{if(!session)return;try{setRecords((await api.get("/attendance/",{params:{session_id:Number(session)}})).data);}catch(e:any){setMessage(e.response?.data?.detail||"Could not load attendance.");}};
+  return <main style={s.page}><p style={s.eyebrow}>{organizer?"Organizer operations":"Attendee portal"}</p><h1 style={s.title}>{organizer?"Session check-in desk":"My attendance"}</h1><p style={s.muted}>{organizer?"Select a session and attendee; database IDs are never entered manually.":"Enter the code shown at the session desk (or scan its QR representation when deployed)."}</p>{message&&<p role="status" style={s.notice}>{message}</p>}
+    <section style={s.card}>{organizer?<><label style={s.label}>Session<select value={session} onChange={e=>setSession(e.target.value)} style={s.input}>{sessions.map(x=><option key={x.id} value={x.id}>{x.title} · {new Date(x.start_time).toLocaleString()}</option>)}</select></label><label style={s.label}>Registered attendee<select value={attendee} onChange={e=>setAttendee(e.target.value)} style={s.input}>{attendees.map(x=><option key={x.id} value={x.id}>{x.name} · {x.role} · {x.email}</option>)}</select></label><div style={s.code}>Session check-in code: <strong>{sessions.find(x=>String(x.id)===session)?.check_in_code}</strong></div><div style={s.actions}><button onClick={mark} style={s.button}>Mark attended</button><button onClick={view} style={s.secondary}>View attendance</button></div></>:<form onSubmit={checkIn} style={{display:"grid",gap:14}}><label style={s.label}>Session check-in code<input value={code} onChange={e=>setCode(e.target.value)} placeholder="CMS-0001" required pattern="CMS-[0-9]{4}" style={s.input}/></label><button style={s.button}>Check in</button></form>}</section>
+    {records.length>0&&<section style={s.card}><h2>Attendance records</h2>{records.map(r=><div key={r.id} style={s.row}>{attendees.find(a=>a.id===r.user_id)?.name||"You"}<strong>{r.attended?"Attended":"Absent"}</strong></div>)}</section>}
+  </main>;
+}
+const s:Record<string,React.CSSProperties>={page:{maxWidth:900,margin:"0 auto"},eyebrow:{color:"#67e8f9",fontSize:12,fontWeight:800,textTransform:"uppercase",letterSpacing:".12em"},title:{color:"#f8fafc"},muted:{color:"#94a3b8"},notice:{padding:12,background:"#164e63",borderRadius:8,color:"#cffafe"},card:{display:"grid",gap:16,marginTop:20,padding:24,border:"1px solid #334155",borderRadius:14,background:"#0f172a",color:"#f8fafc"},label:{display:"grid",gap:8,fontWeight:700},input:{padding:13,border:"1px solid #64748b",borderRadius:8,background:"#111827",color:"white"},actions:{display:"flex",gap:10},button:{padding:"12px 18px",border:0,borderRadius:8,background:"#0e7490",color:"white",fontWeight:800,cursor:"pointer"},secondary:{padding:"12px 18px",border:"1px solid #64748b",borderRadius:8,background:"#1e293b",color:"white",fontWeight:700,cursor:"pointer"},code:{padding:14,borderRadius:8,background:"#172554"},row:{display:"flex",justifyContent:"space-between",padding:"10px 0",borderTop:"1px solid #334155"}};

@@ -11,7 +11,7 @@ The app currently supports the following prototype workflows:
 - User authentication with JWT tokens and role checks
 - Organizer/participant access patterns
 - Registration creation and per-user registration queries
-- Payment creation/confirmation flow for registrations
+- Server-priced registration payments with gateway-style order/callback states, receipts, and refunds
 - Attendance marking and attendance lookup
 - Feedback submission and summary views
 - Sponsor and exhibitor management
@@ -125,6 +125,7 @@ This smoke test exercises the major prototype login, profile, conference, dashbo
 
 - The project uses SQLite locally; the database file is created under the backend folder.
 - The backend initializes demo data automatically when needed.
+- Payments use an explicit `college_demo_gateway` adapter locally. It behaves like a hosted UPI/card checkout and records order and transaction references, but never collects card or UPI credentials. For deployment, replace the callback adapter with the college's Razorpay, PayU, SBI Collect, or approved provider integration and verify its signed webhook server-side.
 - This repository is a prototype and not a fully production-hardened conference platform.
 
 ## License

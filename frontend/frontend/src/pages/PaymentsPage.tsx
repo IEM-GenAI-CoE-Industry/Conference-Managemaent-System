@@ -1,73 +1,21 @@
 import { useEffect, useState } from "react";
 import api from "../api";
 
-type Payment = { id: number; registration_id: number; amount: number; status: string };
+type Registration = { id:number; conference_name:string; category:string; fee:number; currency:string; payment_status:string };
+type Payment = { id:number; registration_id:number; conference_name:string; category:string; amount:number; currency:string; status:string; gateway_order_id?:string; gateway_payment_id?:string; failure_reason?:string };
 
 export default function PaymentsPage() {
-  const isOrganizer = localStorage.getItem("role") === "organizer";
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [registrationId, setRegistrationId] = useState("");
-  const [amount, setAmount] = useState("");
-  const [confirmId, setConfirmId] = useState("");
-  const [message, setMessage] = useState("");
-  const load = async () => {
-    try { setPayments((await api.get<Payment[]>("/payments/me")).data); }
-    catch (error: any) { setMessage(error.response?.data?.detail || "Unable to load payments."); }
-  };
-  useEffect(() => { load(); }, []);
-  const create = async (event: React.FormEvent) => {
-    event.preventDefault();
-    try { await api.post("/payments/", { registration_id: Number(registrationId), amount: Number(amount) }); setMessage("Payment created."); setRegistrationId(""); setAmount(""); load(); }
-    catch (error: any) { setMessage(error.response?.data?.detail || "Unable to create payment."); }
-  };
-  const confirm = async (event: React.FormEvent) => {
-    event.preventDefault();
-    try { await api.post(`/payments/${Number(confirmId)}/confirm`); setMessage("Payment confirmed."); setConfirmId(""); load(); }
-    catch (error: any) { setMessage(error.response?.data?.detail || "Unable to confirm payment."); }
-  };
-  return (
-    <main style={styles.page}>
-      <header style={styles.header}><p style={styles.eyebrow}>Billing</p><h1 style={styles.title}>Payments</h1></header>
-      {message && <p role="status" style={styles.message}>{message}</p>}
-      <div style={styles.grid}>
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>Create Payment</h2>
-          <form onSubmit={create} style={styles.form}>
-            <label style={styles.label}>Registration ID<input required type="number" min="1" placeholder="e.g. 12" value={registrationId} onChange={(e) => setRegistrationId(e.target.value)} style={styles.input} /></label>
-            <label style={styles.label}>Amount<input required type="number" min="1" step="0.01" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={styles.input} /></label>
-            <button style={styles.button}>Create Payment</button>
-          </form>
-        </section>
-        {isOrganizer && <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>Confirm Payment</h2>
-          <form onSubmit={confirm} style={styles.form}>
-            <label style={styles.label}>Payment ID<input required type="number" min="1" placeholder="e.g. 24" value={confirmId} onChange={(e) => setConfirmId(e.target.value)} style={styles.input} /></label>
-            <button style={styles.button}>Confirm Payment</button>
-          </form>
-        </section>}
-      </div>
-      <section style={styles.section}>
-        <h2 style={styles.sectionTitle}>My Payments</h2>
-        {payments.length ? <ul style={styles.list}>{payments.map((payment) => <li key={payment.id} style={styles.listItem}><strong>Payment #{payment.id}</strong><span>Registration #{payment.registration_id}</span><span>{Number(payment.amount).toFixed(2)}</span><span style={styles.status}>{payment.status}</span></li>)}</ul> : <p style={styles.empty}>No payments found.</p>}
-      </section>
-    </main>
-  );
+  const [registrations,setRegistrations]=useState<Registration[]>([]); const [payments,setPayments]=useState<Payment[]>([]); const [selected,setSelected]=useState(""); const [message,setMessage]=useState(""); const [checkout,setCheckout]=useState<Payment|null>(null); const [busy,setBusy]=useState(false);
+  const load=async()=>{try{const [r,p]=await Promise.all([api.get("/registrations/me"),api.get("/payments/me")]);setRegistrations(r.data);setPayments(p.data);const eligible=r.data.find((x:Registration)=>x.fee>0&&x.payment_status!=="paid");if(eligible&&!selected)setSelected(String(eligible.id));}catch(e:any){setMessage(e.response?.data?.detail||"Could not load payments.");}};
+  useEffect(()=>{void load();},[]);
+  const start=async()=>{setBusy(true);setMessage("");try{const response=await api.post("/payments/",{registration_id:Number(selected)});setCheckout(response.data);}catch(e:any){setMessage(e.response?.data?.detail||"Could not start checkout.");}finally{setBusy(false);}};
+  const finish=async(outcome:"success"|"failed"|"cancelled")=>{if(!checkout)return;setBusy(true);try{const response=await api.post(`/payments/${checkout.id}/gateway-callback`,{outcome});setCheckout(null);setMessage(response.data.status==="paid"?"Payment verified. Your registration is confirmed and receipt is ready.":response.data.failure_reason);await load();}catch(e:any){setMessage(e.response?.data?.detail||"Gateway response could not be verified.");}finally{setBusy(false);}};
+  const receipt=async(id:number)=>{try{const r=await api.get(`/payments/${id}/receipt`);const x=r.data;const body=`COLLEGE CONFERENCE RECEIPT\n${x.receipt_number}\n${x.conference_name}\n${x.category}\nAmount: ₹${x.amount}\nStatus: ${x.status}\nTransaction: ${x.gateway_payment_id}`;const url=URL.createObjectURL(new Blob([body],{type:"text/plain"}));const a=document.createElement("a");a.href=url;a.download=`${x.receipt_number}.txt`;a.click();URL.revokeObjectURL(url);}catch(e:any){setMessage(e.response?.data?.detail||"Receipt unavailable.");}};
+  const due=registrations.filter(r=>r.fee>0&&r.payment_status!=="paid"); const chosen=due.find(r=>String(r.id)===selected);
+  return <main style={s.page}><header><p style={s.eyebrow}>Participant / author finance</p><h1 style={s.title}>Registration payments</h1><p style={s.muted}>Choose one of your registrations. The payable amount comes from the college fee card and cannot be edited.</p></header>{message&&<p role="status" style={s.notice}>{message}</p>}
+    <section style={s.card}><h2>Pay registration fee</h2>{due.length===0?<p style={s.muted}>No unpaid registration fees.</p>:<><label style={s.label}>Registration<select value={selected} onChange={e=>setSelected(e.target.value)} style={s.input}>{due.map(r=><option key={r.id} value={r.id}>{r.conference_name} · {r.category} · ₹{r.fee.toLocaleString("en-IN")}</option>)}</select></label>{chosen&&<div style={s.summary}><span>Total payable</span><strong style={{fontSize:24}}>₹{chosen.fee.toLocaleString("en-IN")}</strong><small>Taxes included · INR · server verified</small></div>}<button onClick={start} disabled={busy||!selected} style={s.button}>Proceed to secure checkout</button></>}</section>
+    {checkout&&<div style={s.overlay}><section style={s.checkout}><p style={s.eyebrow}>College Demo Gateway</p><h2>Pay ₹{checkout.amount.toLocaleString("en-IN")}</h2><p>{checkout.conference_name}</p><p style={s.muted}>Order {checkout.gateway_order_id}</p><div style={s.methods}><button onClick={()=>finish("success")} disabled={busy} style={s.button}>Pay with UPI / card</button><button onClick={()=>finish("failed")} disabled={busy} style={s.secondary}>Simulate bank decline</button><button onClick={()=>finish("cancelled")} disabled={busy} style={s.secondary}>Cancel</button></div><small style={s.muted}>Demo gateway: in production this callback is signed and verified by Razorpay/PayU or the college payment provider.</small></section></div>}
+    <section style={s.card}><h2>Payment history</h2>{payments.length===0?<p style={s.muted}>No transactions yet.</p>:payments.map(p=><article key={p.id} style={s.row}><div><strong>{p.conference_name}</strong><div style={s.muted}>{p.category} · {p.gateway_payment_id||p.gateway_order_id}</div></div><div style={{textAlign:"right"}}><strong>₹{p.amount.toLocaleString("en-IN")}</strong><div style={{textTransform:"capitalize"}}>{p.status}</div>{(p.status==="paid"||p.status==="refunded")&&<button onClick={()=>receipt(p.id)} style={s.textButton}>Download receipt</button>}</div></article>)}</section>
+  </main>;
 }
-const styles: Record<string, React.CSSProperties> = {
-  page: { width: "100%", maxWidth: 1100, margin: "0 auto", padding: "12px 0 40px" },
-  header: { marginBottom: 24 },
-  eyebrow: { margin: "0 0 6px", color: "#67e8f9", fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em" },
-  title: { margin: 0, color: "#f8fafc", fontSize: 34 },
-  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))", gap: 18 },
-  section: { marginTop: 18, padding: 24, border: "1px solid rgba(148,163,184,0.2)", borderRadius: 14, background: "linear-gradient(145deg, rgba(15,23,42,0.96), rgba(30,41,59,0.88))", boxShadow: "0 16px 32px rgba(2,6,23,0.22)" },
-  sectionTitle: { margin: "0 0 18px", color: "#f8fafc", fontSize: 21 },
-  form: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 16, alignItems: "end" },
-  label: { display: "grid", gap: 8, color: "#dbeafe", fontWeight: 700, fontSize: 14 },
-  input: { width: "100%", minHeight: 50, padding: "12px 14px", color: "#f8fafc", background: "#0b1220", border: "1px solid #475569", borderRadius: 8, fontSize: 16, boxSizing: "border-box" },
-  button: { minHeight: 50, padding: "12px 18px", border: 0, borderRadius: 8, background: "#0e7490", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer" },
-  message: { padding: "12px 16px", color: "#fef3c7", background: "rgba(146,64,14,0.24)", border: "1px solid rgba(251,191,36,0.25)", borderRadius: 8 },
-  list: { display: "grid", gap: 10, listStyle: "none", margin: 0, padding: 0 },
-  listItem: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, alignItems: "center", padding: "14px 16px", color: "#e2e8f0", background: "rgba(2,6,23,0.38)", border: "1px solid rgba(148,163,184,0.14)", borderRadius: 8 },
-  status: { color: "#a5f3fc", textTransform: "capitalize", fontWeight: 700 },
-  empty: { color: "#cbd5e1", margin: 0 },
-};
+const s:Record<string,React.CSSProperties>={page:{maxWidth:900,margin:"0 auto",display:"grid",gap:20},eyebrow:{color:"#67e8f9",fontSize:12,fontWeight:800,textTransform:"uppercase",letterSpacing:".12em"},title:{color:"#f8fafc"},muted:{color:"#94a3b8"},notice:{padding:14,borderRadius:10,background:"#164e63",color:"#cffafe"},card:{padding:24,border:"1px solid #334155",borderRadius:16,background:"#0f172a",color:"#f8fafc"},label:{display:"grid",gap:8,fontWeight:700},input:{padding:13,borderRadius:8,border:"1px solid #64748b",background:"#111827",color:"white"},summary:{display:"grid",gap:4,margin:"18px 0",padding:16,borderRadius:10,background:"#172554"},button:{padding:"12px 18px",border:0,borderRadius:8,background:"#2563eb",color:"white",fontWeight:800,cursor:"pointer"},secondary:{padding:"11px 16px",border:"1px solid #64748b",borderRadius:8,background:"transparent",color:"white",cursor:"pointer"},row:{display:"flex",justifyContent:"space-between",gap:16,padding:"16px 0",borderTop:"1px solid #334155"},textButton:{border:0,background:"transparent",color:"#67e8f9",cursor:"pointer",padding:0,marginTop:6},overlay:{position:"fixed",inset:0,display:"grid",placeItems:"center",background:"rgba(2,6,23,.78)",zIndex:20},checkout:{width:"min(440px,90vw)",padding:28,borderRadius:18,background:"white",color:"#0f172a",boxShadow:"0 24px 70px #000"},methods:{display:"grid",gap:10,margin:"20px 0"}};

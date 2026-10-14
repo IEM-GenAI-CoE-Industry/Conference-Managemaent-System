@@ -14,7 +14,8 @@ export const roleOptions: RoleOption[] = [
 
 const everyone: AppRole[] = [...appRoles];
 const eventAudience: AppRole[] = ["organizer", "participant", "author", "reviewer", "speaker"];
-const attendeeRoles: AppRole[] = ["organizer", "participant"];
+const attendeeRoles: AppRole[] = ["participant", "author", "reviewer", "speaker"];
+const payingRoles: AppRole[] = ["participant", "author"];
 const announcementRoles: AppRole[] = ["organizer", "participant", "author", "speaker"];
 const certificateRoles: AppRole[] = ["organizer", "participant", "author", "speaker"];
 
@@ -24,8 +25,8 @@ export const routeRoles: Record<string, AppRole[]> = {
   "/conferences": eventAudience,
   "/sessions": eventAudience,
   "/registrations": attendeeRoles,
-  "/payments": attendeeRoles,
-  "/attendance": attendeeRoles,
+  "/payments": payingRoles,
+  "/attendance": ["organizer", ...attendeeRoles],
   "/submissions": ["author"],
   "/organizer/submissions": ["organizer"],
   "/reviews": ["organizer", "reviewer"],

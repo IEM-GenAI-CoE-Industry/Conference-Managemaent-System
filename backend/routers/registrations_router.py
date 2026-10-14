@@ -41,7 +41,7 @@ def create_registration(payload: RegistrationCreate, db: Session = Depends(get_d
         raise HTTPException(403, f"The {category} category is invitation-only.")
     existing = db.query(Registration).filter(Registration.user_id == current_user.id, Registration.conference_id == conference.id).first()
     if existing:
-        raise HTTPException(409, "You are already registered for this conference. Open My Registrations to continue payment.")
+        raise HTTPException(400, "You are already registered for this conference. Open My Registrations to continue payment.")
     registration = Registration(user_id=current_user.id, conference_id=conference.id, category=category)
     db.add(registration)
     db.commit()

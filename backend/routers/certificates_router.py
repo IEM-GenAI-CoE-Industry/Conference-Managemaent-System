@@ -35,6 +35,17 @@ class CertOut(BaseModel):
         from_attributes = True
 
 
+@router.get("/options")
+def certificate_options(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    attended = db.query(Attendance).join(SessionModel, Attendance.session_id == SessionModel.id).filter(Attendance.attended.is_(True))
+    if current_user.role != "organizer":
+        attended = attended.filter(Attendance.user_id == current_user.id)
+    pairs = {(row.user_id, row.session.conference_id) for row in attended.all()}
+    conferences = {c.id: c for c in db.query(Conference).all()}
+    users = {u.id: u for u in db.query(User).all()}
+    return [{"conference_id": conference_id, "conference_name": conferences[conference_id].title, "user_id": user_id, "attendee_name": users[user_id].username, "eligible": True} for user_id, conference_id in sorted(pairs)]
+
+
 @router.post(
     "/generate",
     response_model=CertOut,

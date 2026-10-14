@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
-from backend.models import Attendance, Conference, Session as SessionModel, User
+from backend.models import Attendance, Conference, Registration, Session as SessionModel, User
 
 router = APIRouter(prefix="/attendance", tags=["Attendance"])
 
@@ -13,6 +13,44 @@ class AttendanceMark(BaseModel):
     user_id: int
     session_id: int
     attended: bool = True
+
+
+class SelfCheckIn(BaseModel):
+    code: str
+
+
+@router.get("/options")
+def attendance_options(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    sessions = db.query(SessionModel).order_by(SessionModel.start_time).all()
+    if current_user.role != "organizer":
+        registered_conferences = [row[0] for row in db.query(Registration.conference_id).filter(Registration.user_id == current_user.id).all()]
+        sessions = [session for session in sessions if session.conference_id in registered_conferences]
+    data = {"sessions": [{"id": s.id, "title": s.title, "start_time": s.start_time, "location": s.location, "check_in_code": f"CMS-{s.id:04d}" if current_user.role == "organizer" else None} for s in sessions]}
+    if current_user.role == "organizer":
+        data["attendees"] = [{"id": u.id, "name": u.username, "email": u.email, "role": u.role} for u in db.query(User).filter(User.role.in_(["participant", "author", "speaker", "reviewer"])).order_by(User.username).all()]
+    return data
+
+
+@router.post("/check-in", status_code=status.HTTP_201_CREATED)
+def self_check_in(payload: SelfCheckIn, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    code = payload.code.strip().upper()
+    if not code.startswith("CMS-") or not code[4:].isdigit():
+        raise HTTPException(422, "Enter the check-in code displayed by the organizer")
+    session = db.query(SessionModel).filter(SessionModel.id == int(code[4:])).first()
+    if not session:
+        raise HTTPException(404, "This check-in code is not valid")
+    registered = db.query(Registration).filter(Registration.user_id == current_user.id, Registration.conference_id == session.conference_id).first()
+    if not registered:
+        raise HTTPException(403, "You must be registered for this conference before checking in")
+    record = db.query(Attendance).filter(Attendance.user_id == current_user.id, Attendance.session_id == session.id).first()
+    if not record:
+        record = Attendance(user_id=current_user.id, session_id=session.id, attended=True)
+        db.add(record)
+    else:
+        record.attended = True
+    db.commit()
+    db.refresh(record)
+    return record
 
 
 @router.post("/mark", status_code=status.HTTP_201_CREATED)
