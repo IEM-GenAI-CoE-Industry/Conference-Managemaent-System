@@ -15,7 +15,7 @@ export const roleOptions: RoleOption[] = [
 const everyone: AppRole[] = [...appRoles];
 const eventAudience: AppRole[] = ["organizer", "participant", "author", "reviewer", "speaker"];
 const attendeeRoles: AppRole[] = ["participant", "author", "reviewer", "speaker"];
-const payingRoles: AppRole[] = ["participant", "author"];
+const payingRoles: AppRole[] = ["organizer", "participant", "author"];
 const announcementRoles: AppRole[] = ["organizer", "participant", "author", "speaker"];
 const certificateRoles: AppRole[] = ["organizer", "participant", "author", "speaker"];
 

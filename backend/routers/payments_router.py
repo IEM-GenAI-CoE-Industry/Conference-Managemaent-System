@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
-from backend.models import Payment, Registration, User
+from backend.models import Conference, Payment, Registration, User
 from backend.routers.registrations_router import CATEGORY_FEES
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
@@ -27,6 +27,44 @@ def now():
 
 def serialize(payment: Payment):
     return {"id": payment.id, "registration_id": payment.registration_id, "conference_name": payment.registration.conference.title, "category": payment.registration.category, "amount": payment.amount, "currency": payment.currency, "status": payment.status, "provider": payment.provider, "gateway_order_id": payment.gateway_order_id, "gateway_payment_id": payment.gateway_payment_id, "failure_reason": payment.failure_reason, "created_at": payment.created_at, "confirmed_at": payment.confirmed_at, "refunded_at": payment.refunded_at}
+
+
+def serialize_for_organizer(payment: Payment):
+    return {
+        **serialize(payment),
+        "attendee_name": payment.user.username,
+        "attendee_email": payment.user.email,
+        "attendee_role": payment.user.role,
+        "conference_id": payment.registration.conference_id,
+    }
+
+
+@router.get("/manage")
+def manage_payments(db: Session = Depends(get_db), current_user: User = Depends(require_role("organizer"))):
+    payments = (
+        db.query(Payment)
+        .join(Registration, Payment.registration_id == Registration.id)
+        .join(Conference, Registration.conference_id == Conference.id)
+        .filter(Conference.organizer_id == current_user.id)
+        .order_by(Payment.created_at.desc())
+        .all()
+    )
+    rows = [serialize_for_organizer(payment) for payment in payments]
+    paid = [payment for payment in payments if payment.status == "paid"]
+    refunded = [payment for payment in payments if payment.status == "refunded"]
+    return {
+        "summary": {
+            "transactions": len(payments),
+            "paid_count": len(paid),
+            "pending_count": sum(payment.status == "pending" for payment in payments),
+            "failed_count": sum(payment.status in {"failed", "cancelled"} for payment in payments),
+            "refunded_count": len(refunded),
+            "collected": round(sum(payment.amount for payment in paid), 2),
+            "refunded": round(sum(payment.amount for payment in refunded), 2),
+            "currency": "INR",
+        },
+        "payments": rows,
+    }
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -81,6 +119,8 @@ def refund_payment(payment_id: int, db: Session = Depends(get_db), current_user:
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
     if not payment:
         raise HTTPException(404, "Payment not found")
+    if payment.registration.conference.organizer_id != current_user.id:
+        raise HTTPException(403, "You can only refund payments for conferences you organize")
     if payment.status != "paid":
         raise HTTPException(409, "Only a paid transaction can be refunded")
     payment.status = "refunded"
@@ -99,7 +139,8 @@ def get_my_payments(db: Session = Depends(get_db), current_user: User = Depends(
 @router.get("/{payment_id}/receipt")
 def get_receipt(payment_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
-    if not payment or (payment.user_id != current_user.id and current_user.role != "organizer"):
+    organizer_owns_conference = bool(payment and current_user.role == "organizer" and payment.registration.conference.organizer_id == current_user.id)
+    if not payment or (payment.user_id != current_user.id and not organizer_owns_conference):
         raise HTTPException(404, "Receipt not found")
     if payment.status not in {"paid", "refunded"}:
         raise HTTPException(409, "A receipt is available after successful payment")
