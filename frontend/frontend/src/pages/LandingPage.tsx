@@ -68,11 +68,6 @@ export default function LandingPage() {
             <strong>Ideas become impact.</strong>
             <span>Connect. Collaborate. Create.</span>
           </div>
-          <div className="landing-floating-card">
-            <span className="landing-live-indicator" />
-            <span><strong>Made for meaningful moments</strong><small>Your conference, beautifully connected</small></span>
-            <span className="landing-card-sparkle" aria-hidden="true">✳</span>
-          </div>
           <span className="landing-image-outline" aria-hidden="true" />
         </div>
       </section>

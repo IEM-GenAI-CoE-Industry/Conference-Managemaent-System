@@ -120,8 +120,7 @@
   text-transform: uppercase;
 }
 
-.landing-eyebrow-dot,
-.landing-live-indicator {
+.landing-eyebrow-dot {
   width: 8px;
   height: 8px;
   display: inline-block;
@@ -327,54 +326,6 @@
   font-size: 12px;
 }
 
-.landing-floating-card {
-  position: absolute;
-  z-index: 3;
-  top: 112px;
-  right: -12px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  max-width: 285px;
-  padding: 15px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.78);
-  border-radius: 15px;
-  background: rgba(255, 255, 255, 0.91);
-  box-shadow: 0 16px 44px rgba(30, 31, 59, 0.17);
-  backdrop-filter: blur(14px);
-}
-
-.landing-floating-card .landing-live-indicator {
-  flex: 0 0 auto;
-  width: 9px;
-  height: 9px;
-  background: #7e70d0;
-  box-shadow: 0 0 0 4px rgba(126, 112, 208, 0.13);
-}
-
-.landing-floating-card strong,
-.landing-floating-card small {
-  display: block;
-}
-
-.landing-floating-card strong {
-  color: #282b3f;
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.landing-floating-card small {
-  margin-top: 4px;
-  color: #828598;
-  font-size: 9px;
-}
-
-.landing-card-sparkle {
-  margin-left: auto;
-  color: #b17854;
-  font-size: 18px;
-}
-
 .landing-footer {
   display: flex;
   align-items: center;
@@ -410,9 +361,6 @@
     min-height: 450px;
   }
 
-  .landing-floating-card {
-    right: -5px;
-  }
 }
 
 @media (max-width: 700px) {
@@ -487,13 +435,6 @@
 
   .landing-image-outline {
     inset: 0 0 34px 34px;
-  }
-
-  .landing-floating-card {
-    top: 68px;
-    right: -6px;
-    max-width: 250px;
-    padding: 12px;
   }
 
   .landing-image-caption {
