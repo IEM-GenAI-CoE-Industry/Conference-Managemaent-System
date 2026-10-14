@@ -1,5 +1,9 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+
 from backend.database import Base, SessionLocal, engine, upgrade_sqlite_schema
 import backend.models  # noqa: F401
 from backend.auth import router as auth_router, user_directory_router
@@ -52,6 +56,13 @@ def home(): return {"message":"Conference Management System API is running"}
 
 @app.get("/health")
 def health(): return {"status":"healthy"}
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    favicon_path = Path(__file__).resolve().parent / "static" / "favicon.ico"
+    if favicon_path.exists():
+        return FileResponse(favicon_path)
+    return {"detail": "Favicon not found"}
 
 app.include_router(auth_router)
 app.include_router(user_directory_router)
