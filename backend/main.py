@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 from backend.database import Base, SessionLocal, engine, upgrade_sqlite_schema
 import backend.models  # noqa: F401
 from backend.auth import router as auth_router, user_directory_router
+from backend.auth import hash_password, verify_password
 from backend.routers import conferences_router, sessions_router, sponsors_router, resource_forecast_router, feedback_router, dashboard_router, registrations_router, payments_router, attendance_router, bottleneck_router, reviewer_workload_router
 
 
@@ -27,6 +28,29 @@ def ensure_demo_seed() -> None:
                 engine.dispose()
                 from backend.seed_demo import seed
                 seed()
+                return
+
+            # Demo credentials are part of the public local-development contract.
+            # Reconcile them on startup so profile experiments or an interrupted
+            # smoke test cannot make the README credentials stop working.
+            demo_accounts = {
+                "organizer@demo.com": ("Demo Organizer", "organizer"),
+                "participant@demo.com": ("Demo Participant", "participant"),
+                "author@demo.com": ("Demo Author", "author"),
+                "reviewer@demo.com": ("Demo Reviewer", "reviewer"),
+                "speaker@demo.com": ("Demo Speaker", "speaker"),
+            }
+            changed = False
+            for email, (name, role) in demo_accounts.items():
+                user = db.query(backend.models.User).filter(backend.models.User.email == email).first()
+                if user and not verify_password("demo123", user.password):
+                    user.password = hash_password("demo123")
+                    changed = True
+                if user and not user.is_active:
+                    user.is_active = True
+                    changed = True
+            if changed:
+                db.commit()
     except Exception:
         pass
 
