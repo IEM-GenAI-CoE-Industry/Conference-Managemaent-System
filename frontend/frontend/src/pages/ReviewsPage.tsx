@@ -6,6 +6,12 @@ interface Paper {
   status: string;
   title?: string;
   abstract?: string;
+  //Update the Paper interface to include keywords and file_url
+  keywords?: string;
+  file_url?: string;
+  score?: number;
+          recommendation?: string;
+          comments?: string;
 }
 
 interface Review {
@@ -42,6 +48,14 @@ export function ReviewsPage() {
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPaper) return;
+    setMessage('');
+    
+    // Enforcement for H-08: Check comments if Recommendation is 'Reject'
+    if (recommendation.toLowerCase() === 'reject' && comments.trim().length < 10) {
+      setMessage('Error: Detailed feedback comments (at least 10 characters) are required for a Reject recommendation.');
+      return;
+    }
+
     try {
       await api.post('/reviews/submit', {
         submission_id: selectedPaper.submission_id,
@@ -52,9 +66,17 @@ export function ReviewsPage() {
       setMessage('Review submitted successfully!');
       setSelectedPaper(null);
       setComments('');
-    } catch (err: any) {
-      setMessage(`Error: ${err.message}`);
+      
+      fetchAssignedReviews(); // Refresh list after submission
+    
+    } 
+    catch (err: any) {
+      const errorDetail = err.response?.data?.detail || err.message;
+      setMessage(`Error: ${errorDetail}`);
     }
+    // catch (err: any) {
+    //   setMessage(`Error: ${err.message}`);
+    // }
   };
 
   const fetchReviewsForSubmission = async (subId: string) => {
@@ -99,8 +121,22 @@ export function ReviewsPage() {
           </p>
         </div>
 
-        {message && (
+        {/* {message && (
           <div style={{ padding: '12px 16px', backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0', color: '#047857', borderRadius: '8px', marginBottom: '20px', fontWeight: 500 }}>
+            {message}
+          </div>
+        )} */}
+
+        {message && (
+          <div style={{ 
+            padding: '12px 16px', 
+            backgroundColor: message.startsWith('Error') ? '#FEF2F2' : '#ECFDF5', 
+            border: `1px solid ${message.startsWith('Error') ? '#FECACA' : '#A7F3D0'}`, 
+            color: message.startsWith('Error') ? '#B91C1C' : '#047857', 
+            borderRadius: '8px', 
+            marginBottom: '20px', 
+            fontWeight: 500 
+          }}>
             {message}
           </div>
         )}
@@ -126,12 +162,25 @@ export function ReviewsPage() {
                       <td style={{ padding: '14px 16px', color: '#0F172A', fontWeight: 600 }}>#{paper.submission_id}</td>
                       <td style={{ padding: '14px 16px', color: '#0F172A', fontWeight: 500 }}>{paper.title || `Submission #${paper.submission_id}`}</td>
                       <td style={{ padding: '14px 16px' }}>
-                        <button
+                        {/* <button
                           onClick={() => setSelectedPaper(paper)}
                           style={{ backgroundColor: '#4F46E5', color: '#FFFFFF', border: 'none', borderRadius: '6px', padding: '6px 14px', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }}
                         >
                           Review
+                        </button> */}
+
+                        <button
+                          onClick={() => {
+                            setSelectedPaper(paper);
+                            if (paper.score) setScore(paper.score);
+                            if (paper.recommendation) setRecommendation(paper.recommendation);
+                            if (paper.comments) setComments(paper.comments);
+                          }}
+                          style={{ backgroundColor: '#4F46E5', color: '#FFFFFF', border: 'none', borderRadius: '6px', padding: '6px 14px', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }}
+                        >
+                          {paper.score ? 'Edit Review' : 'Review'}
                         </button>
+                        
                       </td>
                     </tr>
                   ))
@@ -152,9 +201,47 @@ export function ReviewsPage() {
               <h3 style={{ margin: '0 0 8px 0', fontSize: '1.125rem', color: '#0F172A', fontWeight: 600 }}>
                 Reviewing: {selectedPaper.title}
               </h3>
-              <p style={{ color: '#64748B', fontSize: '0.875rem', marginBottom: '20px', lineHeight: '1.5' }}>
-                <strong style={{ color: '#334155' }}>Abstract:</strong> {selectedPaper.abstract}
-              </p>
+              <div style={{ marginBottom: '20px' }}>
+                <strong style={{ color: '#334155', display: 'block', marginBottom: '4px', fontSize: '0.8125rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Abstract:
+                </strong>
+                  <p style={{ color: '#475569', fontSize: '0.875rem', margin: 0, lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                    {selectedPaper.abstract || 'No abstract provided for this submission.'}
+                  </p>
+                </div>
+
+                {/* Keywords Badge */}
+                {selectedPaper.keywords && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <strong style={{ color: '#334155', display: 'block', marginBottom: '4px', fontSize: '0.8125rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Keywords:
+                    </strong>
+                    <span style={{ backgroundColor: '#EEF2FF', color: '#3730A3', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, border: '1px solid #C7D2FE' }}>
+                      {selectedPaper.keywords}
+                    </span>
+                  </div>
+                )}
+
+                {/* Manuscript Document Download Link (C-07 Fix) */}
+                <div style={{ marginBottom: '20px' }}>
+                  <strong style={{ color: '#334155', display: 'block', marginBottom: '6px', fontSize: '0.8125rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Manuscript File:
+                  </strong>
+                  {selectedPaper.file_url ? (
+                    <a
+                      href={selectedPaper.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: '#4F46E5', color: '#FFFFFF', padding: '8px 14px', borderRadius: '6px', fontSize: '0.875rem', fontWeight: 600, textDecoration: 'none' }}
+                    >
+                      📄 View / Download Manuscript PDF
+                    </a>
+                  ) : (
+                    <span style={{ fontSize: '0.875rem', color: '#D97706', fontStyle: 'italic', backgroundColor: '#FEF3C7', padding: '6px 12px', borderRadius: '6px', display: 'inline-block' }}>
+                      ⚠️ No manuscript file URL attached to this paper.
+                    </span>
+                  )}
+                </div>
 
               <form onSubmit={handleReviewSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
@@ -185,6 +272,7 @@ export function ReviewsPage() {
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>Comments:</label>
+                  Comments: {recommendation.toLowerCase() === 'reject' && <span style={{ color: '#B91C1C' }}>*(Required for Reject)</span>}
                   <textarea
                     value={comments}
                     onChange={(e) => setComments(e.target.value)}
