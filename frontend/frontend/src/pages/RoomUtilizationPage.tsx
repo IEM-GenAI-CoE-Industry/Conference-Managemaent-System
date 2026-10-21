@@ -1,5 +1,6 @@
 import { useState } from "react";
 import api from "../api";
+import "./RoomUtilizationPage.css";
 
 type RoomSession = {
   session_id: number;
@@ -166,149 +167,161 @@ function RoomUtilizationPage() {
   }
 
   return (
-    <div>
-      <h1>Room Utilization</h1>
+    <main className="room-utilization-page">
+      <header className="room-utilization-header">
+        <p className="room-utilization-eyebrow">Conference operations</p>
+        <h1>Room Utilization</h1>
+        <p>Review session capacity and find better room assignments.</p>
+      </header>
 
       {error && (
-        <p style={{ color: "red" }}>
+        <p className="room-utilization-error" role="alert">
           {error}
         </p>
       )}
 
-      <form onSubmit={loadRoomData}>
-        <label>Conference ID</label>
-        <br />
-
-        <input
-          type="number"
-          min="1"
-          value={conferenceId}
-          onChange={(e) => setConferenceId(e.target.value)}
-          placeholder="Enter conference ID"
-          required
-        />
-
-        <button type="submit" disabled={loading}>
-          {loading ? "Loading..." : "Load Room Data"}
-        </button>
+      <form className="room-utilization-search" onSubmit={loadRoomData}>
+        <div className="room-utilization-search-copy">
+          <h2>Find room data</h2>
+          <p>Enter a conference ID to see room capacity and suggestions.</p>
+        </div>
+        <div className="room-utilization-search-controls">
+          <label htmlFor="conference-id">Conference ID</label>
+          <div className="room-utilization-input-row">
+            <input
+              id="conference-id"
+              type="number"
+              min="1"
+              value={conferenceId}
+              onChange={(e) => setConferenceId(e.target.value)}
+              placeholder="Enter conference ID"
+              required
+            />
+            <button type="submit" disabled={loading}>
+              {loading ? "Loading..." : "Load Room Data"}
+            </button>
+          </div>
+        </div>
       </form>
 
       {data && (
-        <section>
-          <h2>Room Utilization Table</h2>
-
-          <p>
-            <strong>Total Sessions:</strong>{" "}
-            {data.total_sessions}
-          </p>
-
-          <p>
-            <strong>Average Utilization:</strong>{" "}
-            {data.average_utilization}%
-          </p>
+        <section className="room-utilization-card">
+          <div className="room-utilization-section-heading">
+            <div>
+              <p className="room-utilization-eyebrow">Capacity overview</p>
+              <h2>Room Utilization</h2>
+            </div>
+            <div className="room-utilization-metrics">
+              <span>Total sessions</span>
+              <strong>{data.total_sessions}</strong>
+              <span>Average utilization</span>
+              <strong>{data.average_utilization}%</strong>
+            </div>
+          </div>
 
           {data.sessions.length === 0 ? (
-            <p>No sessions found.</p>
+            <p className="room-utilization-empty">No sessions found for this conference.</p>
           ) : (
-            <table border={1} cellPadding={8}>
-              <thead>
-                <tr>
-                  <th>Session</th>
-                  <th>Room</th>
-                  <th>Capacity</th>
-                  <th>Expected Attendees</th>
-                  <th>Utilization %</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {data.sessions.map((session) => (
-                  <tr key={session.session_id}>
-                    <td>{session.session_title}</td>
-                    <td>{session.room}</td>
-                    <td>{session.room_capacity}</td>
-                    <td>{session.expected_attendees}</td>
-                    <td>{session.utilization_pct}%</td>
-                    <td>{session.status}</td>
-
-                    <td>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSelectedSessionId(
-                            String(session.session_id)
-                          )
-                        }
-                      >
-                        Change Room
-                      </button>
-                    </td>
+            <div className="room-utilization-table-wrap">
+              <table className="room-utilization-table">
+                <thead>
+                  <tr>
+                    <th>Session</th>
+                    <th>Room</th>
+                    <th>Capacity</th>
+                    <th>Expected Attendees</th>
+                    <th>Utilization</th>
+                    <th>Status</th>
+                    <th>Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.sessions.map((session) => (
+                    <tr key={session.session_id}>
+                      <td>{session.session_title}</td>
+                      <td>{session.room}</td>
+                      <td>{session.room_capacity}</td>
+                      <td>{session.expected_attendees}</td>
+                      <td>{session.utilization_pct}%</td>
+                      <td><span className="room-utilization-status">{session.status}</span></td>
+                      <td>
+                        <button
+                          className="room-utilization-secondary-button"
+                          type="button"
+                          onClick={() => setSelectedSessionId(String(session.session_id))}
+                        >
+                          Change Room
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
       )}
 
       {selectedSessionId && (
-        <section>
+        <section className="room-utilization-card room-utilization-update">
           <h2>Update Room</h2>
 
-          <input
-            type="text"
-            placeholder="New room name"
-            value={newRoom}
-            onChange={(e) => setNewRoom(e.target.value)}
-          />
-
-          <input
-            type="number"
-            min="1"
-            placeholder="New capacity"
-            value={newCapacity}
-            onChange={(e) => setNewCapacity(e.target.value)}
-          />
-
-          <button
-            type="button"
-            onClick={() =>
-              applyRoomChange(Number(selectedSessionId))
-            }
-          >
-            Apply
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSelectedSessionId("")}
-          >
-            Cancel
-          </button>
+          <div className="room-utilization-update-controls">
+            <label>
+              New room name
+              <input
+                type="text"
+                placeholder="e.g. Main Auditorium"
+                value={newRoom}
+                onChange={(e) => setNewRoom(e.target.value)}
+              />
+            </label>
+            <label>
+              New capacity
+              <input
+                type="number"
+                min="1"
+                placeholder="Enter capacity"
+                value={newCapacity}
+                onChange={(e) => setNewCapacity(e.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => applyRoomChange(Number(selectedSessionId))}
+            >
+              Apply changes
+            </button>
+            <button
+              className="room-utilization-secondary-button"
+              type="button"
+              onClick={() => setSelectedSessionId("")}
+            >
+              Cancel
+            </button>
+          </div>
         </section>
       )}
 
       {data && (
-        <section>
-          <h2>Room Suggestions</h2>
+        <section className="room-utilization-card">
+          <div className="room-utilization-section-heading">
+            <div>
+              <p className="room-utilization-eyebrow">Smarter scheduling</p>
+              <h2>Room Suggestions</h2>
+            </div>
+          </div>
 
           {suggestions.length === 0 ? (
-            <p>No room suggestions available.</p>
+            <p className="room-utilization-empty">No room suggestions available right now.</p>
           ) : (
-            <ul>
+            <ul className="room-utilization-suggestions">
               {suggestions.map((suggestion, index) => (
                 <li key={index}>
-                  <p>
-                    <strong>Reason:</strong>{" "}
-                    {suggestion.reason}
-                  </p>
-
-                  <p>
-                    {suggestion.suggested_swap}
-                  </p>
-
+                  <div>
+                    <strong>{suggestion.reason}</strong>
+                    <p>{suggestion.suggested_swap}</p>
+                  </div>
                   <button
                     type="button"
                     onClick={() =>
@@ -323,7 +336,7 @@ function RoomUtilizationPage() {
           )}
         </section>
       )}
-    </div>
+    </main>
   );
 }
 

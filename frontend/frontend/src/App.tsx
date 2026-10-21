@@ -24,6 +24,7 @@ import AttendancePage from "./pages/AttendancePage";
 import BottleneckPage from "./pages/BottleneckPage.tsx";
 import CertificateVerificationPage from "./pages/CertificateVerificationPage";
 import ProfilePage from "./pages/ProfilePage";
+import LandingPage from "./pages/LandingPage";
 import { type AppRole, roleHome, routeRoles } from "./access";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -75,8 +76,23 @@ export default function App() {
         <Route path="/bottlenecks" element={<RoleRoute path="/bottlenecks"><BottleneckPage /></RoleRoute>} />
       </Route>
 
-      <Route path="/" element={<Navigate replace to={localStorage.getItem("token") ? roleHome(localStorage.getItem("role")) : "/login"} />} />
-      <Route path="*" element={<Navigate replace to={localStorage.getItem("token") ? roleHome(localStorage.getItem("role")) : "/login"} />} />
+      <Route
+        path="/"
+        element={
+          localStorage.getItem("token")
+            ? <Navigate replace to={roleHome(localStorage.getItem("role"))} />
+            : <LandingPage />
+        }
+      />
+      <Route
+        path="*"
+        element={
+          <Navigate
+            replace
+            to={localStorage.getItem("token") ? roleHome(localStorage.getItem("role")) : "/"}
+          />
+        }
+      />
     </Routes>
   );
 }

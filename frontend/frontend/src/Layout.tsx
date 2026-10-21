@@ -17,6 +17,13 @@ export default function Layout() {
     localStorage.removeItem("token");
     localStorage.removeItem("role");
     localStorage.removeItem("user_id");
+    navigate("/", { replace: true });
+  };
+
+  const handleSwitchAccount = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    localStorage.removeItem("user_id");
     navigate("/login", { replace: true });
   };
 
@@ -46,8 +53,21 @@ export default function Layout() {
           ))}
         </nav>
 
-        <button type="button" onClick={handleLogout} style={styles.logoutButton} title="End this session and return to login">
+        <button
+          type="button"
+          onClick={handleSwitchAccount}
+          style={styles.accountButton}
+          title="End this session and sign in to another account"
+        >
           Switch account
+        </button>
+        <button
+          type="button"
+          onClick={handleLogout}
+          style={styles.logoutButton}
+          title="Log out and return to the IEM home page"
+        >
+          Log out
         </button>
       </aside>
 
@@ -133,13 +153,25 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#ffffff",
     boxShadow: "inset 0 0 0 1px rgba(96, 165, 250, 0.2)",
   },
-  logoutButton: {
+  accountButton: {
     marginTop: "auto",
     padding: "11px 14px",
     border: "1px solid rgba(148, 163, 184, 0.24)",
     borderRadius: 12,
     background: "rgba(15, 23, 42, 0.8)",
     color: "#f8fafc",
+    cursor: "pointer",
+    fontSize: "0.9rem",
+    fontWeight: 700,
+    boxShadow: "0 10px 24px rgba(15, 23, 42, 0.45)",
+  },
+  logoutButton: {
+    marginTop: 8,
+    padding: "11px 14px",
+    border: "1px solid rgba(248, 113, 113, 0.3)",
+    borderRadius: 12,
+    background: "rgba(127, 29, 29, 0.2)",
+    color: "#fecaca",
     cursor: "pointer",
     fontSize: "0.9rem",
     fontWeight: 700,
