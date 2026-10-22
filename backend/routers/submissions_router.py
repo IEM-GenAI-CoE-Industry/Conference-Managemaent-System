@@ -161,6 +161,14 @@ def create_submission(
     if not db.query(Conference).filter(Conference.id == payload.conference_id).first():
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Conference not found")
 
+#  DUPLICATE TITLE CHECK 
+    existing_submission = db.query(Submission).filter(Submission.title == payload.title.strip()).first()
+    if existing_submission:
+        raise HTTPException(
+            status_code=400,
+            detail="A submission with this title already exists. Duplicate titles are not allowed."
+        )
+        
     submission = Submission(
         conference_id=payload.conference_id,
         author_id=current_user.id,

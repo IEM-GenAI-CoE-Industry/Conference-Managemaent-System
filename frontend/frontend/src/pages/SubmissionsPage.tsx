@@ -55,6 +55,9 @@ export function SubmissionsPage() {
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loadingReviews, setLoadingReviews] = useState<boolean>(false);
+  // State for viewing submission details
+  const [selectedSubmissionDetail, setSelectedSubmissionDetail] = useState<any>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   const fetchMySubmissions = async () => {
     try {
@@ -189,6 +192,29 @@ export function SubmissionsPage() {
       setMessage(`Error: ${err.message}`);
     }
   };
+
+  // Function to fetch full detail payload including timeline and reviews
+const handleViewDetail = async (id: number) => {
+  setLoadingDetail(true);
+  try {
+    const token = localStorage.getItem("token"); // or your auth token retrieval method
+    const response = await fetch(`http://localhost:8000/submissions/${id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (response.ok) {
+      const data = await response.json();
+      setSelectedSubmissionDetail(data);
+    } else {
+      alert("Failed to load submission details.");
+    }
+  } catch (error) {
+    console.error("Error fetching submission detail:", error);
+  } finally {
+    setLoadingDetail(false);
+  }
+};
 
   const getStatusBadgeStyle = (status: string): React.CSSProperties => {
     const base: React.CSSProperties = {
@@ -330,26 +356,40 @@ export function SubmissionsPage() {
             </div>
 
             {/* File Upload / PDF Input Section (H-05 Support) */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>PDF File / URL</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={handleFileUpload}
-                  disabled={uploadingFile}
-                  style={{ fontSize: '0.875rem' }}
-                />
-                <input
-                  type="text"
-                  placeholder="https://example.com/paper.pdf or /static/uploads/file.pdf"
-                  value={form.file_url}
-                  onChange={(e) => setForm({ ...form, file_url: e.target.value })}
-                  required
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.875rem', outline: 'none' }}
-                />
-              </div>
-            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#334155' }}>
+    Manuscript PDF File (Max 15 MB)
+  </label>
+  <input 
+    type="file" 
+    accept=".pdf"
+    disabled={uploadingFile}
+    onChange={(e) => {
+      const file = e.target.files?.[0];
+      if (file && file.size > 15 * 1024 * 1024) {
+        alert("File size exceeds 15 MB limit. Please choose a smaller file.");
+        e.target.value = ""; // Clear the input
+        return;
+      }
+      // Call your existing upload handler if size is valid
+      if (file) {
+        handleFileUpload(e);
+      }
+    }}
+    style={{ fontSize: '0.875rem' }}
+  />
+  <input
+    type="text"
+    placeholder="https://example.com/paper.pdf or /static/uploads/file.pdf"
+    value={form.file_url}
+    onChange={(e) => setForm({ ...form, file_url: e.target.value })}
+    required
+    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.875rem' }}
+  />
+  <small style={{ color: '#6B7280', fontSize: '0.75rem' }}>
+    Upload a PDF file (max 15 MB) or provide a direct file URL.
+  </small>
+</div>
 
             <button
               type="submit"
@@ -524,6 +564,22 @@ export function SubmissionsPage() {
                         </button>
                       )}
 
+<button
+  onClick={() => handleViewDetail(sub.id)}
+  style={{
+    backgroundColor: '#3B82F6',
+    color: '#FFFFFF',
+    padding: '6px 12px',
+    borderRadius: '6px',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '0.875rem',
+    fontWeight: 500,
+  }}
+>
+  View Details & Timeline
+</button>
+
                       {['submitted', 'under_review'].includes(sub.status) && (
                         <button
                           onClick={async () => {
@@ -626,6 +682,102 @@ export function SubmissionsPage() {
                 No completed reviews available for this paper yet.
               </div>
             )}
+          </div>
+        )}
+
+{/* Submission Detail & Timeline Modal */}
+        {selectedSubmissionDetail && (
+          <div style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000,
+          }}>
+            <div style={{
+              backgroundColor: '#FFFFFF',
+              padding: '24px',
+              borderRadius: '12px',
+              width: '600px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#1E293B' }}>
+                  Submission #{selectedSubmissionDetail.id}: {selectedSubmissionDetail.title}
+                </h2>
+                <button 
+                  onClick={() => setSelectedSubmissionDetail(null)}
+                  style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748B' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <strong style={{ color: '#475569' }}>Status:</strong>{' '}
+                <span style={{ 
+                  padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
+                  backgroundColor: '#E2E8F0', color: '#334155' 
+                }}>
+                  {selectedSubmissionDetail.status.toUpperCase()}
+                </span>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <strong style={{ color: '#475569' }}>Abstract:</strong>
+                <p style={{ margin: '4px 0 0 0', color: '#334155', fontSize: '0.875rem', lineHeight: 1.5 }}>
+                  {selectedSubmissionDetail.abstract}
+                </p>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <strong style={{ color: '#475569' }}>Manuscript File:</strong>
+                <div style={{ marginTop: '4px' }}>
+                  {selectedSubmissionDetail.file_url ? (
+                    <a 
+                      href={selectedSubmissionDetail.file_url.startsWith('http') ? selectedSubmissionDetail.file_url : `http://localhost:8000${selectedSubmissionDetail.file_url}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#2563EB', textDecoration: 'underline', fontSize: '0.875rem' }}
+                    >
+                      📥 Download Manuscript PDF
+                    </a>
+                  ) : (
+                    <span style={{ color: '#94A3B8', fontSize: '0.875rem' }}>No file uploaded</span>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <strong style={{ color: '#475569' }}>Reviewer Feedback & Scores:</strong>
+                {selectedSubmissionDetail.reviews && selectedSubmissionDetail.reviews.length > 0 ? (
+                  selectedSubmissionDetail.reviews.map((rev: any, index: number) => (
+                    <div key={index} style={{ backgroundColor: '#F8FAFC', padding: '12px', borderRadius: '8px', marginTop: '8px', border: '1px solid #E2E8F0' }}>
+                      <p style={{ margin: '0 0 4px 0', fontSize: '0.875rem' }}><strong>Recommendation:</strong> {rev.recommendation}</p>
+                      <p style={{ margin: '0 0 4px 0', fontSize: '0.875rem' }}><strong>Score:</strong> {rev.score}/10</p>
+                      <p style={{ margin: 0, fontSize: '0.875rem', color: '#475569' }}><strong>Comments:</strong> {rev.comments || "No comments provided."}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p style={{ fontSize: '0.875rem', color: '#94A3B8', fontStyle: 'italic', margin: '4px 0 0 0' }}>
+                    No reviews submitted yet. Currently under evaluation workflow.
+                  </p>
+                )}
+              </div>
+
+              <div style={{ textAlign: 'right', marginTop: '24px' }}>
+                <button 
+                  onClick={() => setSelectedSubmissionDetail(null)}
+                  style={{ backgroundColor: '#475569', color: '#FFFFFF', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer' }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

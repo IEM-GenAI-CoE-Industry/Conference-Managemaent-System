@@ -729,7 +729,7 @@ export function ReviewsPage() {
                       </select>
                     </div>
 
-                    <div>
+                    {/* <div>
                       <label htmlFor="review-comments" style={formLabelStyle}>
                         Comments:
                       </label>
@@ -742,6 +742,35 @@ export function ReviewsPage() {
                         style={{
                           ...formInputStyle,
                           resize: 'vertical',
+                        }}
+                      />
+                    </div> */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <label htmlFor="review-comments" style={{ ...formLabelStyle, marginBottom: 0 }}>
+                          Comments:
+                        </label>
+                        {recommendation.toLowerCase() === 'reject' && comments.trim().length < 10 && (
+                          <span style={{ color: '#DC2626', fontSize: '0.75rem', fontWeight: 700 }}>
+                            ⚠️ Cannot be blank*
+                          </span>
+                        )}
+                      </div>
+                      <textarea
+                        id="review-comments"
+                        value={comments}
+                        onChange={(e) => setComments(e.target.value)}
+                        required
+                        rows={4}
+                        style={{
+                          ...formInputStyle,
+                          resize: 'vertical',
+                          border: recommendation.toLowerCase() === 'reject' && comments.trim().length < 10
+                            ? '2px solid #DC2626'
+                            : '1px solid #CBD5E1',
+                          backgroundColor: recommendation.toLowerCase() === 'reject' && comments.trim().length < 10
+                            ? '#FEF2F2'
+                            : '#FFFFFF',
                         }}
                       />
                     </div>
@@ -816,42 +845,59 @@ export function ReviewsPage() {
                       />
                     </div>
 
-                    <div
+                    {/* <div
                       style={{
                         display: 'flex',
                         gap: '12px',
                         marginTop: '8px',
                       }}
-                    >
-                      <button
-                        type="submit"
-                        disabled={submittingReview}
-                        style={{
-                          ...buttonStyle,
-                          flex: 1,
-                          opacity: submittingReview ? 0.6 : 1,
-                          cursor: submittingReview ? 'not-allowed' : 'pointer',
-                        }}
-                      >
-                        {submittingReview ? 'Submitting...' : 'Submit Review'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPaper(null)}
-                        style={{
-                          backgroundColor: '#F1F5F9',
-                          color: '#475569',
-                          border: '1px solid #CBD5E1',
-                          borderRadius: '6px',
-                          padding: '10px 18px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
+                    > */}
+                    {/* Action Buttons: Submit button validates Rejection comments before allowing submit */}
+  {(() => {
+    const isRejectionInvalid =
+      recommendation.toLowerCase() === 'reject' && comments.trim().length < 10;
+    const isSubmitDisabled = submittingReview || isRejectionInvalid;
+
+    return (
+      <div
+        style={{
+          display: 'flex',
+          gap: '12px',
+          marginTop: '8px',
+        }}
+      >
+        <button
+          type="submit"
+          disabled={isSubmitDisabled}
+          style={{
+            ...buttonStyle,
+            flex: 1,
+            opacity: isSubmitDisabled ? 0.5 : 1,
+            cursor: isSubmitDisabled ? 'not-allowed' : 'pointer',
+            backgroundColor: isSubmitDisabled ? '#94A3B8' : '#4F46E5',
+          }}
+        >
+          {submittingReview ? 'Submitting...' : 'Submit Review'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setSelectedPaper(null)}
+          style={{
+            backgroundColor: '#F1F5F9',
+            color: '#475569',
+            border: '1px solid #CBD5E1',
+            borderRadius: '6px',
+            padding: '10px 18px',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  })()}
+</form>
                 </div>
               )}
             </div>
@@ -897,19 +943,24 @@ export function ReviewsPage() {
                       Manuscript File:
                     </strong>
                     {selectedPaper.file_url ? (
-                      <a
-                        href={selectedPaper.file_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: '#4F46E5', color: '#FFFFFF', padding: '8px 14px', borderRadius: '6px', fontSize: '0.875rem', fontWeight: 600, textDecoration: 'none' }}
-                      >
-                        📄 View / Download Manuscript PDF
-                      </a>
-                    ) : (
-                      <span style={{ fontSize: '0.875rem', color: '#D97706', fontStyle: 'italic', backgroundColor: '#FEF3C7', padding: '6px 12px', borderRadius: '6px', display: 'inline-block' }}>
-                        ⚠️ No manuscript file URL attached to this paper.
-                      </span>
-                    )}
+  <a
+    href={
+      selectedPaper.file_url.startsWith('http')
+        ? selectedPaper.file_url
+        : `http://localhost:8000${selectedPaper.file_url}`
+    }
+    target="_blank"
+    rel="noopener noreferrer"
+    onClick={(e) => e.stopPropagation()} // Prevents event bubbling/routing loops
+    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: '#4F46E5', color: '#FFFFFF', padding: '8px 14px', borderRadius: '6px', fontSize: '0.875rem', fontWeight: 600, textDecoration: 'none' }}
+  >
+    📄 View / Download Manuscript PDF
+  </a>
+) : (
+  <span style={{ fontSize: '0.875rem', color: '#D97706', fontStyle: 'italic' }}>
+    ⚠️ No manuscript file URL attached.
+  </span>
+)}
                   </div>
                 </>
               )}

@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
-from backend.models import Attendance, Certificate, Conference, Session as SessionModel, User
+from backend.models import Attendance, Certificate, Conference, Session as SessionModel, Submission, User
 
 MOCK_USER_ID = 1
 
@@ -82,9 +82,19 @@ def generate_certificate(
         )
         .first()
     )
+    
+    has_accepted_paper = (
+        db.query(Submission)
+        .filter(
+            Submission.conference_id == payload.conference_id,
+            Submission.author_id == target_user_id,
+            Submission.status.in_(["accepted", "final_accepted", "camera_ready_submitted"])
+        )
+        .first()
+    )
 
 # Fix for C-06: Explicit attendance check with specific detail message instead of generic 403
-    if not has_attended:
+    if not has_attended and not has_accepted_paper and current_user.role != "organizer":
         raise HTTPException(
             #status_code=status.HTTP_400_BAD_REQUEST,
             #detail="User has not attended any session in this conference",

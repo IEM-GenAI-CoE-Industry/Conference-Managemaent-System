@@ -62,8 +62,6 @@ class ReviewOut(BaseModel):
     
     
     deadline: Optional[datetime] = None
-    title: Optional[str] = None
-    abstract: Optional[str] = None
     originality_score: Optional[int] = None
     methodology_score: Optional[int] = None
     clarity_score: Optional[int] = None
@@ -196,18 +194,26 @@ def save_review_draft(
     review.confidence_score = payload.confidence_score
     review.confidential_comments = payload.confidential_comments
     review.status = "draft"
-
+   
     db.commit()
     db.refresh(review)
     
-    # Attach joined paper fields to output payload
-    review.title = submission.title
-    review.abstract = submission.abstract
-    review.keywords = getattr(submission, "keywords", None)
-    review.file_url = getattr(submission, "file_url", None)
+    # # Attach joined paper fields to output payload
+    # review.title = submission.title
+    # review.abstract = submission.abstract
+    # review.keywords = getattr(submission, "keywords", None)
+    # review.file_url = getattr(submission, "file_url", None)
+    
+    # return review
+# Safely fetch submission to attach joined fields
+    submission = db.query(Submission).filter(Submission.id == payload.submission_id).first()
+    if submission:
+        review.title = submission.title
+        review.abstract = submission.abstract
+        review.keywords = getattr(submission, "keywords", None)
+        review.file_url = getattr(submission, "file_url", None)
     
     return review
-
 
 @router.post("/submit", response_model=ReviewOut)
 def submit_review(
@@ -225,16 +231,11 @@ def submit_review(
         .first()
     )
     if not review:
-        # raise HTTPException(404, "Review assignment not found")
         raise HTTPException(status_code=404, detail="Review assignment not found")
 
-# Check if the paper submission decision has already been finalized
     submission = db.query(Submission).filter(Submission.id == payload.submission_id).first()
-    if submission and submission.status in ["accepted", "rejected", "final_accepted"]:
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot update review. The paper decision has already been finalized."
-        )
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
 
     # Fix for H-08: Mandatory comments when recommendation is 'Reject'
     clean_recommendation = payload.recommendation.strip()
@@ -244,9 +245,8 @@ def submit_review(
             detail="Detailed feedback comments (at least 10 characters) are required for a Reject recommendation"
         )
 
-
     review.score = payload.score
-    review.recommendation = payload.recommendation.strip()
+    review.recommendation = clean_recommendation
     review.comments = payload.comments
 
     review.originality_score = payload.originality_score
@@ -259,19 +259,25 @@ def submit_review(
     review.status = "completed"
     review.submitted_at = datetime.utcnow()
 
+    # Automatically map review recommendation to submission status for the organizer dashboard
+    rec_lower = clean_recommendation.lower()
+    if "accept" in rec_lower:
+        submission.status = "accepted"
+    elif "reject" in rec_lower:
+        submission.status = "rejected"
+    else:
+        submission.status = "reviewed" # For revisions or general completion
 
     db.commit()
     db.refresh(review)
+    db.refresh(submission)
     
-    submission = db.query(Submission).filter(Submission.id == review.submission_id).first()
-    if submission:
-        review.title = submission.title
-        review.abstract = submission.abstract
-        review.keywords = getattr(submission, "keywords", None)
-        review.file_url = getattr(submission, "file_url", None)
+    review.title = submission.title
+    review.abstract = submission.abstract
+    review.keywords = getattr(submission, "keywords", None)
+    review.file_url = getattr(submission, "file_url", None)
     
     return review
-
 
 
 @router.get("/mine", response_model=List[ReviewOut])
@@ -289,7 +295,12 @@ def list_my_reviews(
 
     result = []
 
+    #for review, submission in reviews:
     for review, submission in reviews:
+        review.title = submission.title
+        review.abstract = submission.abstract
+        review.keywords = getattr(submission, "keywords", None)
+        review.file_url = getattr(submission, "file_url", None)  
         result.append(
             ReviewOut(
                 id=review.id,
@@ -302,6 +313,13 @@ def list_my_reviews(
                 title=submission.title,
                 abstract=submission.abstract,
                 deadline=review.deadline,
+                keywords=review.keywords,
+                file_url=review.file_url,
+                originality_score=review.originality_score,
+                methodology_score=review.methodology_score,
+                clarity_score=review.clarity_score,
+                significance_score=review.significance_score,
+                confidence_score=review.confidence_score,
             )
         )
 
