@@ -1,3 +1,4 @@
+import uuid
 from typing import List, Optional
 from io import BytesIO
 
@@ -12,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
-from backend.models import Attendance, Certificate, Conference, Session as SessionModel, User
+from backend.models import Attendance, Certificate, Conference, Session as SessionModel, Submission, User
 
 MOCK_USER_ID = 1
 
@@ -54,16 +55,23 @@ def certificate_options(db: Session = Depends(get_db), current_user: User = Depe
 def generate_certificate(
     payload: CertGenerateSchema,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("organizer")),
+    #current_user: User = Depends(require_role("organizer")),
+    current_user: User = Depends(get_current_user),
 ):
     if not db.query(Conference).filter(Conference.id == payload.conference_id).first():
-        raise HTTPException(404, "Conference not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conference not found")
 
-    target_user_id = payload.user_id or current_user.id
-
+   # target_user_id = payload.user_id or current_user.id
+    # 2. Determine target user (Non-organizers can only generate for themselves)
+    if current_user.role == "organizer" and payload.user_id:
+        target_user_id = payload.user_id
+    else:
+        target_user_id = current_user.id
+        
+        
     if not db.query(User).filter(User.id == target_user_id).first():
-        raise HTTPException(404, "User not found")
-
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+# Fix for C-06: Explicit attendance check with specific detail message instead of generic 403
     has_attended = (
         db.query(Attendance)
         .join(SessionModel, Attendance.session_id == SessionModel.id)
@@ -74,11 +82,26 @@ def generate_certificate(
         )
         .first()
     )
+    
+    has_accepted_paper = (
+        db.query(Submission)
+        .filter(
+            Submission.conference_id == payload.conference_id,
+            Submission.author_id == target_user_id,
+            Submission.status.in_(["accepted", "final_accepted", "camera_ready_submitted"])
+        )
+        .first()
+    )
 
-    if not has_attended:
+# Fix for C-06: Explicit attendance check with specific detail message instead of generic 403
+    if not has_attended and not has_accepted_paper and current_user.role != "organizer":
         raise HTTPException(
-            status_code=400,
-            detail="User has not attended any session in this conference",
+            #status_code=status.HTTP_400_BAD_REQUEST,
+            #detail="User has not attended any session in this conference",
+
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Certificate generation denied: User ID {target_user_id} has no verified attendance records for conference ID {payload.conference_id}.",        
+        
         )
 
     existing = (
@@ -92,15 +115,34 @@ def generate_certificate(
     if existing:
         return existing
 
+# Fix for M-17: Standardized Professional Certificate ID format
+    formatted_uuid = f"CERT-CONF{payload.conference_id}-2026-{uuid.uuid4().hex[:6].upper()}"
+
     cert = Certificate(
         user_id=target_user_id,
         conference_id=payload.conference_id,
+        certificate_uuid=formatted_uuid,
     )
     db.add(cert)
     db.commit()
     db.refresh(cert)
     return cert
 
+# Fix for M-18: Organizer bulk export endpoint for conference certificates
+@router.get("/conference/{conference_id}", response_model=List[CertOut])
+def get_conference_certificates(
+    conference_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("organizer")),
+):
+    if not db.query(Conference).filter(Conference.id == conference_id).first():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conference not found")
+
+    return (
+        db.query(Certificate)
+        .filter(Certificate.conference_id == conference_id)
+        .all()
+    )
 
 @router.get("/verify/{cert_uuid}", response_model=CertOut)
 def verify_certificate(
@@ -114,7 +156,7 @@ def verify_certificate(
     )
     if not cert:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Certificate is invalid or non-existent",
         )
     return cert

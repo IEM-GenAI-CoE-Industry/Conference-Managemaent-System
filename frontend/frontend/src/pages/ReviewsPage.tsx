@@ -6,6 +6,13 @@ interface Paper {
   status: string;
   title?: string;
   abstract?: string;
+  // [HEAD]: Added keywords and file_url support to Paper interface
+  keywords?: string;
+  file_url?: string;
+  score?: number;
+  recommendation?: string;
+  comments?: string;
+  // [origin/snehansha]: Added deadline tracking
   deadline?: string | null;
 }
 
@@ -66,8 +73,8 @@ export function ReviewsPage() {
   const [message, setMessage] = useState<string>('');
   const [submissionReviews, setSubmissionReviews] = useState<Review[]>([]);
   const [confidentialReviewComments, setConfidentialReviewComments] = useState<
-  { review_id: number; reviewer_id: number; confidential_comments: string | null }[]
->([]);
+    { review_id: number; reviewer_id: number; confidential_comments: string | null }[]
+  >([]);
   const [searchSubmissionId, setSearchSubmissionId] = useState<string>('');
 
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -103,49 +110,49 @@ export function ReviewsPage() {
     }
   };
 
-
+  // [origin/snehansha]: Debounced review draft autosaving hook
   useEffect(() => {
-  if (!selectedPaper || isOrganizer || submittingReview) return;
+    if (!selectedPaper || isOrganizer || submittingReview) return;
 
-  if (draftTimer.current) clearTimeout(draftTimer.current);
-
-  draftTimer.current = setTimeout(async () => {
-    try {
-      await api.post('/reviews/draft', {
-        submission_id: selectedPaper.submission_id,
-        score,
-        recommendation,
-        comments,
-        originality_score: originalityScore,
-        methodology_score: methodologyScore,
-        clarity_score: clarityScore,
-        significance_score: significanceScore,
-        confidence_score: confidenceScore,
-        confidential_comments: confidentialComments,
-      });
-      setDraftStatus('Draft saved');
-    } catch {
-      setDraftStatus('Draft not saved yet');
-    }
-  }, 1000);
-
-  return () => {
     if (draftTimer.current) clearTimeout(draftTimer.current);
-  };
-}, [
-  selectedPaper,
-  isOrganizer,
-  submittingReview,
-  score,
-  recommendation,
-  comments,
-  originalityScore,
-  methodologyScore,
-  clarityScore,
-  significanceScore,
-  confidenceScore,
-  confidentialComments,
-]);
+
+    draftTimer.current = setTimeout(async () => {
+      try {
+        await api.post('/reviews/draft', {
+          submission_id: selectedPaper.submission_id,
+          score,
+          recommendation,
+          comments,
+          originality_score: originalityScore,
+          methodology_score: methodologyScore,
+          clarity_score: clarityScore,
+          significance_score: significanceScore,
+          confidence_score: confidenceScore,
+          confidential_comments: confidentialComments,
+        });
+        setDraftStatus('Draft saved');
+      } catch {
+        setDraftStatus('Draft not saved yet');
+      }
+    }, 1000);
+
+    return () => {
+      if (draftTimer.current) clearTimeout(draftTimer.current);
+    };
+  }, [
+    selectedPaper,
+    isOrganizer,
+    submittingReview,
+    score,
+    recommendation,
+    comments,
+    originalityScore,
+    methodologyScore,
+    clarityScore,
+    significanceScore,
+    confidenceScore,
+    confidentialComments,
+  ]);
 
   const filteredPapers = assignedPapers.filter((paper) => {
     const matchesStatus =
@@ -173,26 +180,33 @@ export function ReviewsPage() {
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPaper || submittingReview) return;
-if (!window.confirm('Are you sure you want to submit this review? You will not be able to edit it afterward.')) {
-  return;
-}
+
+    // [HEAD]: Enforcement for H-08 - Checking detailed comments for 'Reject'
+    if (recommendation.toLowerCase() === 'reject' && comments.trim().length < 10) {
+      setMessage('Error: Detailed feedback comments (at least 10 characters) are required for a Reject recommendation.');
+      return;
+    }
+
+    if (!window.confirm('Are you sure you want to submit this review? You will not be able to edit it afterward.')) {
+      return;
+    }
 
     setSubmittingReview(true);
     setMessage('');
 
     try {
       await api.post('/reviews/submit', {
-      submission_id: selectedPaper.submission_id,
-      score,
-      recommendation,
-      comments,
-      originality_score: originalityScore,
-      methodology_score: methodologyScore,
-      clarity_score: clarityScore,
-      significance_score: significanceScore,
-      confidence_score: confidenceScore,
-      confidential_comments: confidentialComments,
-    });
+        submission_id: selectedPaper.submission_id,
+        score,
+        recommendation,
+        comments,
+        originality_score: originalityScore,
+        methodology_score: methodologyScore,
+        clarity_score: clarityScore,
+        significance_score: significanceScore,
+        confidence_score: confidenceScore,
+        confidential_comments: confidentialComments,
+      });
 
       setMessage('Review submitted successfully!');
       setSelectedPaper(null);
@@ -212,34 +226,35 @@ if (!window.confirm('Are you sure you want to submit this review? You will not b
     }
   };
 
- const fetchReviewsForSubmission = async (subId: string) => {
-  if (!subId.trim()) {
-    setMessage('Please enter a submission ID.');
-    return;
-  }
-
-  setMessage('');
-  setSubmissionReviews([]);
-  setConfidentialReviewComments([]);
-
-  try {
-    const res = await api.get(`/reviews/?submission_id=${subId}`);
-    setSubmissionReviews(res.data);
-
-    const confidentialRes = await api.get(
-      `/reviews/confidential/${subId}`
-    );
-    setConfidentialReviewComments(confidentialRes.data);
-
-    if (res.data.length === 0) {
-      setMessage('No reviews found for this submission.');
+  const fetchReviewsForSubmission = async (subId: string) => {
+    if (!subId.trim()) {
+      setMessage('Please enter a submission ID.');
+      return;
     }
-  } catch (err: any) {
-    setMessage(
-      err.response?.data?.detail || 'Failed to fetch submission reviews.'
-    );
-  }
-};
+
+    setMessage('');
+    setSubmissionReviews([]);
+    setConfidentialReviewComments([]);
+
+    try {
+      const res = await api.get(`/reviews/?submission_id=${subId}`);
+      setSubmissionReviews(res.data);
+
+      const confidentialRes = await api.get(
+        `/reviews/confidential/${subId}`
+      );
+      setConfidentialReviewComments(confidentialRes.data);
+
+      if (res.data.length === 0) {
+        setMessage('No reviews found for this submission.');
+      }
+    } catch (err: any) {
+      setMessage(
+        err.response?.data?.detail || 'Failed to fetch submission reviews.'
+      );
+    }
+  };
+
   const declareConflict = async (e: React.FormEvent) => {
     e.preventDefault();
     if (declaringCoi) return;
@@ -360,13 +375,13 @@ if (!window.confirm('Are you sure you want to submit this review? You will not b
             role="status"
             style={{
               padding: '12px 16px',
-              backgroundColor: message.startsWith('Error:')
+              backgroundColor: message.startsWith('Error')
                 ? '#FEF2F2'
                 : '#ECFDF5',
               border: `1px solid ${
-                message.startsWith('Error:') ? '#FECACA' : '#A7F3D0'
+                message.startsWith('Error') ? '#FECACA' : '#A7F3D0'
               }`,
-              color: message.startsWith('Error:') ? '#B91C1C' : '#047857',
+              color: message.startsWith('Error') ? '#B91C1C' : '#047857',
               borderRadius: '8px',
               marginBottom: '20px',
               fontWeight: 500,
@@ -565,19 +580,29 @@ if (!window.confirm('Are you sure you want to submit this review? You will not b
                               </td>
                               <td style={{ padding: '14px 16px' }}>
                                 {paper.status.toLowerCase() === 'completed' ? (
-                                  <span
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedPaper(paper);
+                                      if (paper.score) setScore(paper.score);
+                                      if (paper.recommendation) setRecommendation(paper.recommendation);
+                                      if (paper.comments) setComments(paper.comments);
+                                    }}
                                     style={{
-                                      color: '#64748B',
-                                      fontSize: '0.875rem',
+                                      ...buttonStyle,
+                                      backgroundColor: '#64748B',
                                     }}
                                   >
-                                    Submitted
-                                  </span>
+                                    Edit Review
+                                  </button>
                                 ) : (
                                   <button
                                     type="button"
                                     onClick={() => {
                                       setSelectedPaper(paper);
+                                      if (paper.score) setScore(paper.score);
+                                      if (paper.recommendation) setRecommendation(paper.recommendation);
+                                      if (paper.comments) setComments(paper.comments);
                                       setMessage('');
                                     }}
                                     style={buttonStyle}
@@ -633,8 +658,8 @@ if (!window.confirm('Are you sure you want to submit this review? You will not b
                   </h3>
 
                   <p role="status" aria-live="polite" style={{ color: '#475569', fontSize: '0.875rem' }}>
-  {draftStatus}
-</p>
+                    {draftStatus}
+                  </p>
 
                   <p
                     style={{
@@ -671,7 +696,7 @@ if (!window.confirm('Are you sure you want to submit this review? You will not b
                   >
                     <div>
                       <label htmlFor="review-score" style={formLabelStyle}>
-                        Score (1–100):
+                        Score (1–10):
                       </label>
                       <input
                         id="review-score"
@@ -704,7 +729,7 @@ if (!window.confirm('Are you sure you want to submit this review? You will not b
                       </select>
                     </div>
 
-                    <div>
+                    {/* <div>
                       <label htmlFor="review-comments" style={formLabelStyle}>
                         Comments:
                       </label>
@@ -719,117 +744,165 @@ if (!window.confirm('Are you sure you want to submit this review? You will not b
                           resize: 'vertical',
                         }}
                       />
+                    </div> */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <label htmlFor="review-comments" style={{ ...formLabelStyle, marginBottom: 0 }}>
+                          Comments:
+                        </label>
+                        {recommendation.toLowerCase() === 'reject' && comments.trim().length < 10 && (
+                          <span style={{ color: '#DC2626', fontSize: '0.75rem', fontWeight: 700 }}>
+                            ⚠️ Cannot be blank*
+                          </span>
+                        )}
+                      </div>
+                      <textarea
+                        id="review-comments"
+                        value={comments}
+                        onChange={(e) => setComments(e.target.value)}
+                        required
+                        rows={4}
+                        style={{
+                          ...formInputStyle,
+                          resize: 'vertical',
+                          border: recommendation.toLowerCase() === 'reject' && comments.trim().length < 10
+                            ? '2px solid #DC2626'
+                            : '1px solid #CBD5E1',
+                          backgroundColor: recommendation.toLowerCase() === 'reject' && comments.trim().length < 10
+                            ? '#FEF2F2'
+                            : '#FFFFFF',
+                        }}
+                      />
                     </div>
 
-                            {[
-          {
-            label: 'Originality',
-            value: originalityScore,
-            setValue: setOriginalityScore,
-          },
-          {
-            label: 'Methodology',
-            value: methodologyScore,
-            setValue: setMethodologyScore,
-          },
-          {
-            label: 'Clarity',
-            value: clarityScore,
-            setValue: setClarityScore,
-          },
-          {
-            label: 'Significance',
-            value: significanceScore,
-            setValue: setSignificanceScore,
-          },
-          {
-            label: 'Reviewer Confidence',
-            value: confidenceScore,
-            setValue: setConfidenceScore,
-          },
-        ].map((item) => (
-          <div key={item.label}>
-            <label
-              htmlFor={`rubric-${item.label}`}
-              style={formLabelStyle}
-            >
-              {item.label} (1–5):
-            </label>
-            <select
-              id={`rubric-${item.label}`}
-              value={item.value}
-              onChange={(e) => item.setValue(Number(e.target.value))}
-              required
-              style={{
-                ...formInputStyle,
-                backgroundColor: '#FFFFFF',
-              }}
-            >
-              {[1, 2, 3, 4, 5].map((rating) => (
-                <option key={rating} value={rating}>
-                  {rating} {rating === 1 ? '— Poor' : rating === 5 ? '— Excellent' : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-        ))}
+                    {/* [origin/snehansha]: Rubric Scoring Inputs */}
+                    {[
+                      {
+                        label: 'Originality',
+                        value: originalityScore,
+                        setValue: setOriginalityScore,
+                      },
+                      {
+                        label: 'Methodology',
+                        value: methodologyScore,
+                        setValue: setMethodologyScore,
+                      },
+                      {
+                        label: 'Clarity',
+                        value: clarityScore,
+                        setValue: setClarityScore,
+                      },
+                      {
+                        label: 'Significance',
+                        value: significanceScore,
+                        setValue: setSignificanceScore,
+                      },
+                      {
+                        label: 'Reviewer Confidence',
+                        value: confidenceScore,
+                        setValue: setConfidenceScore,
+                      },
+                    ].map((item) => (
+                      <div key={item.label}>
+                        <label
+                          htmlFor={`rubric-${item.label}`}
+                          style={formLabelStyle}
+                        >
+                          {item.label} (1–5):
+                        </label>
+                        <select
+                          id={`rubric-${item.label}`}
+                          value={item.value}
+                          onChange={(e) => item.setValue(Number(e.target.value))}
+                          required
+                          style={{
+                            ...formInputStyle,
+                            backgroundColor: '#FFFFFF',
+                          }}
+                        >
+                          {[1, 2, 3, 4, 5].map((rating) => (
+                            <option key={rating} value={rating}>
+                              {rating} {rating === 1 ? '— Poor' : rating === 5 ? '— Excellent' : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
 
-            <div>
-              <label htmlFor="confidential-comments" style={formLabelStyle}>
-                Confidential Comments (organizers only):
-              </label>
-              <textarea
-                id="confidential-comments"
-                value={confidentialComments}
-                onChange={(e) => setConfidentialComments(e.target.value)}
-                rows={3}
-                style={{
-                  ...formInputStyle,
-                  resize: 'vertical',
-                }}
-              />
-            </div>
+                    <div>
+                      <label htmlFor="confidential-comments" style={formLabelStyle}>
+                        Confidential Comments (organizers only):
+                      </label>
+                      <textarea
+                        id="confidential-comments"
+                        value={confidentialComments}
+                        onChange={(e) => setConfidentialComments(e.target.value)}
+                        rows={3}
+                        style={{
+                          ...formInputStyle,
+                          resize: 'vertical',
+                        }}
+                      />
+                    </div>
 
-                    <div
+                    {/* <div
                       style={{
                         display: 'flex',
                         gap: '12px',
                         marginTop: '8px',
                       }}
-                    >
-                      <button
-                        type="submit"
-                        disabled={submittingReview}
-                        style={{
-                          ...buttonStyle,
-                          flex: 1,
-                          opacity: submittingReview ? 0.6 : 1,
-                          cursor: submittingReview ? 'not-allowed' : 'pointer',
-                        }}
-                      >
-                        {submittingReview ? 'Submitting...' : 'Submit Review'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPaper(null)}
-                        style={{
-                          backgroundColor: '#F1F5F9',
-                          color: '#475569',
-                          border: '1px solid #CBD5E1',
-                          borderRadius: '6px',
-                          padding: '10px 18px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
+                    > */}
+                    {/* Action Buttons: Submit button validates Rejection comments before allowing submit */}
+  {(() => {
+    const isRejectionInvalid =
+      recommendation.toLowerCase() === 'reject' && comments.trim().length < 10;
+    const isSubmitDisabled = submittingReview || isRejectionInvalid;
+
+    return (
+      <div
+        style={{
+          display: 'flex',
+          gap: '12px',
+          marginTop: '8px',
+        }}
+      >
+        <button
+          type="submit"
+          disabled={isSubmitDisabled}
+          style={{
+            ...buttonStyle,
+            flex: 1,
+            opacity: isSubmitDisabled ? 0.5 : 1,
+            cursor: isSubmitDisabled ? 'not-allowed' : 'pointer',
+            backgroundColor: isSubmitDisabled ? '#94A3B8' : '#4F46E5',
+          }}
+        >
+          {submittingReview ? 'Submitting...' : 'Submit Review'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setSelectedPaper(null)}
+          style={{
+            backgroundColor: '#F1F5F9',
+            color: '#475569',
+            border: '1px solid #CBD5E1',
+            borderRadius: '6px',
+            padding: '10px 18px',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  })()}
+</form>
                 </div>
               )}
             </div>
 
+            {/* [HEAD]: Abstract, Keywords, and Manuscript PDF view section */}
             <div
               style={{
                 backgroundColor: '#FFFFFF',
@@ -842,6 +915,57 @@ if (!window.confirm('Are you sure you want to submit this review? You will not b
               <h3 style={{ marginTop: 0, color: '#0F172A' }}>
                 Declare Conflict of Interest
               </h3>
+
+              {selectedPaper && (
+                <>
+                  <div style={{ marginBottom: '20px' }}>
+                    <strong style={{ color: '#334155', display: 'block', marginBottom: '4px', fontSize: '0.8125rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Abstract:
+                    </strong>
+                    <p style={{ color: '#475569', fontSize: '0.875rem', margin: 0, lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                      {selectedPaper.abstract || 'No abstract provided for this submission.'}
+                    </p>
+                  </div>
+
+                  {selectedPaper.keywords && (
+                    <div style={{ marginBottom: '16px' }}>
+                      <strong style={{ color: '#334155', display: 'block', marginBottom: '4px', fontSize: '0.8125rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Keywords:
+                      </strong>
+                      <span style={{ backgroundColor: '#EEF2FF', color: '#3730A3', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, border: '1px solid #C7D2FE' }}>
+                        {selectedPaper.keywords}
+                      </span>
+                    </div>
+                  )}
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <strong style={{ color: '#334155', display: 'block', marginBottom: '6px', fontSize: '0.8125rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Manuscript File:
+                    </strong>
+                    {selectedPaper.file_url ? (
+  <a
+    href={
+      selectedPaper.file_url.startsWith('http')
+        ? selectedPaper.file_url
+        : `http://localhost:8000${selectedPaper.file_url}`
+    }
+    target="_blank"
+    rel="noopener noreferrer"
+    onClick={(e) => e.stopPropagation()} // Prevents event bubbling/routing loops
+    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: '#4F46E5', color: '#FFFFFF', padding: '8px 14px', borderRadius: '6px', fontSize: '0.875rem', fontWeight: 600, textDecoration: 'none' }}
+  >
+    📄 View / Download Manuscript PDF
+  </a>
+) : (
+  <span style={{ fontSize: '0.875rem', color: '#D97706', fontStyle: 'italic' }}>
+    ⚠️ No manuscript file URL attached.
+  </span>
+)}
+                  </div>
+                </>
+              )}
+
+              {/* [origin/snehansha]: COI description text */}
               <p style={{ color: '#64748B', fontSize: '0.875rem' }}>
                 Declare a conflict for a submission you have a personal,
                 professional, or other relevant connection with. This action

@@ -27,7 +27,7 @@ class RoomUpdate(BaseModel):
     room_capacity: int = Field(gt=0)
 
 def out(s):
-    return {"id": s.id, "conference_id": s.conference_id, "title": s.title, "speaker_id": s.speaker_id, "speaker_confirmed": s.speaker_confirmed, "start_time": s.start_time, "end_time": s.end_time, "location": s.location, "room_capacity": s.room_capacity, "expected_attendees": s.expected_attendees}
+    return {"id": s.id, "conference_id": s.conference_id, "title": s.title, "speaker_id": s.speaker_id, "speaker_confirmed": s.speaker_confirmed, "start_time": s.start_time, "end_time": s.end_time, "location": s.location, "room_capacity": s.room_capacity, "expected_attendees": s.expected_attendees, "submission_id": getattr(s, "submission_id", None)}
 
 @router.post("/", status_code=201)
 def create_session(payload: SessionCreate, db: Session = Depends(get_db), current_user=Depends(require_role("organizer"))):
@@ -52,6 +52,26 @@ def confirm_speaker(session_id: int, payload: SpeakerConfirmation, db: Session =
     s = db.query(models.Session).filter(models.Session.id == session_id).first()
     if not s: raise HTTPException(404, "Session not found")
     s.speaker_confirmed = payload.confirmed; db.commit(); db.refresh(s); return out(s)
+
+# ==========================================
+# FIX FOR M-17: My Presentations Endpoint
+# ==========================================
+@router.get("/my-presentations")
+def get_my_presentations(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("author")),
+):
+    """
+    Fetch conference presentation slots assigned to the logged-in author's accepted submissions. (M-17)
+    """
+    author_submissions = db.query(Submission).filter(Submission.author_id == current_user.id).all()
+    sub_ids = [sub.id for sub in author_submissions]
+    
+    if not sub_ids:
+        return []
+
+    presentations = db.query(SessionModel).filter(SessionModel.submission_id.in_(sub_ids)).all()
+    return [out(p) for p in presentations]
 
 @rooms_router.get("/utilization")
 def utilization(conference_id: int, db: Session = Depends(get_db)):
