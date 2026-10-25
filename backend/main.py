@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect, text
 from backend.database import Base, engine
 import backend.models  # noqa: F401
 from backend.auth import router as auth_router
@@ -14,6 +15,30 @@ from backend.routers import certificates_router
 from backend.routers import submissions_router
 
 Base.metadata.create_all(bind=engine)
+
+
+def apply_sqlite_prototype_migrations():
+    """Keep the local demo database usable after small prototype schema additions."""
+    inspector = inspect(engine)
+    if "conferences" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("conferences")}
+    with engine.begin() as connection:
+        if "registration_fee" not in columns:
+            connection.execute(text("ALTER TABLE conferences ADD COLUMN registration_fee FLOAT NOT NULL DEFAULT 0"))
+        if "seat_capacity" not in columns:
+            connection.execute(text("ALTER TABLE conferences ADD COLUMN seat_capacity INTEGER NOT NULL DEFAULT 0"))
+    announcement_columns = {column["name"] for column in inspector.get_columns("announcements")}
+    with engine.begin() as connection:
+        if "audience" not in announcement_columns:
+            connection.execute(text("ALTER TABLE announcements ADD COLUMN audience VARCHAR(100) NOT NULL DEFAULT 'all'"))
+        if "scheduled_for" not in announcement_columns:
+            connection.execute(text("ALTER TABLE announcements ADD COLUMN scheduled_for DATETIME"))
+        if "delivery_channel" not in announcement_columns:
+            connection.execute(text("ALTER TABLE announcements ADD COLUMN delivery_channel VARCHAR(50) NOT NULL DEFAULT 'in-app'"))
+
+
+apply_sqlite_prototype_migrations()
 
 app = FastAPI(title="Conference Management System", version="1.0.0", description="Working prototype for conference lifecycle management")
 app.add_middleware(

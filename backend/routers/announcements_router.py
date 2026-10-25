@@ -1,7 +1,8 @@
-from typing import List
+from datetime import datetime
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from backend.auth import get_current_user, require_role
@@ -14,9 +15,20 @@ router = APIRouter(prefix="/announcements", tags=["Announcements"])
 
 
 class AnnouncementCreate(BaseModel):
-    conference_id: int = MOCK_CONFERENCE_ID
-    title: str
-    message: str
+    conference_id: int = Field(gt=0)
+    title: str = Field(min_length=1, max_length=255)
+    message: str = Field(min_length=1)
+    audience: str = Field(default="all", max_length=100)
+    scheduled_for: Optional[datetime] = None
+    delivery_channel: str = Field(default="in-app", max_length=50)
+
+    @field_validator("title", "message", "audience", "delivery_channel")
+    @classmethod
+    def reject_blank_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("This field cannot be blank")
+        return value
 
 
 class AnnouncementOut(BaseModel):
@@ -24,6 +36,9 @@ class AnnouncementOut(BaseModel):
     conference_id: int
     title: str
     message: str
+    audience: str
+    scheduled_for: Optional[datetime] = None
+    delivery_channel: str
     created_by: int
 
     class Config:
@@ -47,6 +62,9 @@ def create_announcement(
         conference_id=payload.conference_id,
         title=payload.title.strip(),
         message=payload.message.strip(),
+        audience=payload.audience,
+        scheduled_for=payload.scheduled_for,
+        delivery_channel=payload.delivery_channel,
         created_by=current_user.id,
     )
     db.add(announcement)

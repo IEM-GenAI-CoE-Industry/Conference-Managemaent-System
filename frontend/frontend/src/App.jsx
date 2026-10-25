@@ -1,101 +1,106 @@
-import { useEffect, useState } from 'react'
-import './App.css'
+import { useEffect, useState } from "react";
+import "./App.css";
+import AnnouncementsPage from "./pages/AnnouncementsPage";
+import ConferencesPage from "./pages/ConferencesPage";
+import RoomUtilizationPage from "./pages/RoomUtilizationPage";
+import SessionsPage from "./pages/SessionsPage";
 
-const API = 'http://127.0.0.1:8000'
+const API = "http://127.0.0.1:8000";
+const routes = {
+  dashboard: "Dashboard",
+  conferences: "Conferences",
+  sessions: "Sessions",
+  rooms: "Rooms",
+  announcements: "Announcements",
+};
 
-function App() {
-  const [token, setToken] = useState('')
-  const [stats, setStats] = useState(null)
-  const [forecast, setForecast] = useState(null)
-  const [rooms, setRooms] = useState(null)
-  const [alerts, setAlerts] = useState([])
-  const [error, setError] = useState('')
+function Dashboard() {
+  const [stats, setStats] = useState(null);
+  const [forecast, setForecast] = useState(null);
+  const [rooms, setRooms] = useState(null);
+  const [alerts, setAlerts] = useState([]);
+  const [error, setError] = useState("");
 
-  async function api(path, options = {}) {
-    const res = await fetch(`${API}${path}`, {
-      ...options,
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) },
-    })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.detail || 'Request failed')
-    return data
-  }
-
-  async function loadDashboard(authToken = token) {
+  async function loadDashboard() {
     try {
-      setError('')
-      const headers = { Authorization: `Bearer ${authToken}` }
+      setError("");
+      const token = localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const get = async (path) => {
-        const r = await fetch(`${API}${path}`, { headers })
-        const d = await r.json()
-        if (!r.ok) throw new Error(d.detail || 'Request failed')
-        return d
-      }
-      setStats(await get('/dashboard/stats?conference_id=1'))
-      setForecast(await get('/resources/forecast?conference_id=1'))
-      setRooms(await get('/rooms/utilization?conference_id=1'))
-      setAlerts(await get('/bottlenecks?conference_id=1'))
-    } catch (e) { setError(e.message) }
+        const response = await fetch(`${API}${path}`, { headers });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || "Request failed");
+        return data;
+      };
+      const [dashboardData, forecastData, roomData, bottleneckData] = await Promise.all([
+        get("/dashboard/stats?conference_id=1"),
+        get("/resources/forecast?conference_id=1"),
+        get("/rooms/utilization?conference_id=1"),
+        get("/bottlenecks?conference_id=1"),
+      ]);
+      setStats(dashboardData);
+      setForecast(forecastData);
+      setRooms(roomData);
+      setAlerts(bottleneckData);
+    } catch (caughtError) {
+      setError(caughtError.message);
+    }
   }
 
-  async function demoLogin() {
-    try {
-      setError('')
-      const res = await fetch(`${API}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'organizer@demo.com', password: 'demo123' }) })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || 'Login failed')
-      setToken(data.access_token)
-      await loadDashboard(data.access_token)
-    } catch (e) { setError(e.message) }
-  }
+  useEffect(() => { loadDashboard(); }, []);
 
-  useEffect(() => { demoLogin() }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  return (
-    <main className="page">
-      <header className="hero">
-        <div>
-          <p className="eyebrow">CONFERENCE MANAGEMENT SYSTEM</p>
-          <h1>Organizer Control Center</h1>
-          <p className="subtitle">A working prototype for registration, scheduling, attendance and conference operations intelligence.</p>
-        </div>
-        <button onClick={() => loadDashboard()} className="refresh">Refresh</button>
-      </header>
-
-      {error && <div className="error">{error}</div>}
-
-      {stats && <section className="cards">
-        <Card label="Registrations" value={stats.total_registrations} />
-        <Card label="Revenue" value={`₹${stats.total_revenue}`} />
-        <Card label="Sessions" value={stats.total_sessions} />
-        <Card label="Satisfaction" value={stats.satisfaction_avg ? `${stats.satisfaction_avg}/5` : '—'} />
-      </section>}
-
-      <section className="grid">
-        <Panel title="Attendance-Based Resource Forecasting">
-          {forecast ? <div className="metrics"><Metric label="Expected attendance" value={forecast.expected_attendance}/><Metric label="Seats" value={forecast.recommended_seats}/><Metric label="Meals" value={forecast.recommended_meals}/><Metric label="Badges" value={forecast.recommended_badges}/></div> : <Loading/>}
-          {forecast?.alert && <div className="warning">⚠ {forecast.alert}</div>}
-        </Panel>
-
-        <Panel title="Live Bottlenecks">
-          {alerts.length ? alerts.map((a, i) => <div className={`alert ${a.severity}`} key={i}><b>{a.severity.toUpperCase()}</b><span>{a.message}</span></div>) : <div className="success">✓ No active bottlenecks</div>}
-        </Panel>
-
-        <Panel title="Room Utilization Optimizer">
-          {rooms ? rooms.sessions.map(s => <div className="room" key={s.session_id}><div><b>{s.session_title}</b><small>{s.room} · capacity {s.room_capacity}</small></div><span className={`pill ${s.status}`}>{s.utilization_pct}% · {s.status}</span></div>) : <Loading/>}
-        </Panel>
-
-        <Panel title="Prototype Coverage">
-          <ul className="coverage"><li>✓ Authentication & profiles</li><li>✓ Conference & session management</li><li>✓ Registration & payment tracking</li><li>✓ Attendance & feedback</li><li>✓ Sponsor & exhibitor management</li><li>✓ Resource forecasting</li><li>✓ Bottleneck detection</li><li>✓ Room utilization optimization</li><li>⏳ Submissions, reviews & certificates — Swapna's module</li></ul>
-        </Panel>
-      </section>
-    </main>
-  )
+  return <>
+    <div className="page-heading"><div><p className="eyebrow">ORGANIZER CONTROL CENTER</p><h1>Conference operations</h1><p className="subtitle">A live view of registrations, capacity, resources, and operational alerts.</p></div><button className="secondary-button" onClick={loadDashboard}>Refresh</button></div>
+    {error && <div className="error">{error}</div>}
+    {stats && <section className="cards"><Card label="Registrations" value={stats.total_registrations} /><Card label="Revenue" value={`Rs. ${stats.total_revenue}`} /><Card label="Sessions" value={stats.total_sessions} /><Card label="Satisfaction" value={stats.satisfaction_avg ? `${stats.satisfaction_avg}/5` : "-"} /></section>}
+    <section className="grid">
+      <Panel title="Attendance Resource Forecast">{forecast ? <div className="metrics"><Metric label="Expected attendance" value={forecast.expected_attendance} /><Metric label="Seats" value={forecast.recommended_seats} /><Metric label="Meals" value={forecast.recommended_meals} /><Metric label="Badges" value={forecast.recommended_badges} /></div> : <Loading />}{forecast?.alert && <div className="warning">{forecast.alert}</div>}</Panel>
+      <Panel title="Live Bottlenecks">{alerts.length ? alerts.map((alert, index) => <div className={`alert ${alert.severity}`} key={index}><b>{alert.severity.toUpperCase()}</b><span>{alert.message}</span></div>) : <div className="success">No active bottlenecks</div>}</Panel>
+      <Panel title="Room Utilization">{rooms ? <><div className="mini-chart">{rooms.sessions.map((session) => <div className="chart-row" key={session.session_id}><span>{session.session_title}</span><div className="chart-track"><div className={`chart-fill ${session.status}`} style={{ width: `${Math.min(session.utilization_pct, 100)}%` }} /></div><strong>{session.utilization_pct}%</strong></div>)}</div><a className="text-button" href="#/rooms">Open room planner</a></> : <Loading />}</Panel>
+      <Panel title="Prototype Coverage"><ul className="coverage"><li>Authentication and profiles</li><li>Conference and session management</li><li>Registration and payment tracking</li><li>Attendance and feedback</li><li>Sponsor and exhibitor management</li><li>Resource forecasting and bottlenecks</li></ul></Panel>
+    </section>
+  </>;
 }
 
-function Card({ label, value }) { return <div className="card"><span>{label}</span><strong>{value}</strong></div> }
-function Metric({ label, value }) { return <div><span>{label}</span><strong>{value}</strong></div> }
-function Panel({ title, children }) { return <section className="panel"><h2>{title}</h2>{children}</section> }
-function Loading() { return <p className="muted">Loading…</p> }
+function App() {
+  const [route, setRoute] = useState(() => window.location.hash.replace("#/", "") || "dashboard");
+  const [ready, setReady] = useState(false);
+  const [authError, setAuthError] = useState("");
+  useEffect(() => {
+    const onHashChange = () => setRoute(window.location.hash.replace("#/", "") || "dashboard");
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+  useEffect(() => {
+    async function ensureDemoLogin() {
+      if (localStorage.getItem("token")) {
+        setReady(true);
+        return;
+      }
+      try {
+        const response = await fetch(`${API}/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: "organizer@demo.com", password: "demo123" }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || "Demo login failed");
+        localStorage.setItem("token", data.access_token);
+      } catch (caughtError) {
+        setAuthError(caughtError.message);
+      } finally {
+        setReady(true);
+      }
+    }
+    ensureDemoLogin();
+  }, []);
+  const page = { dashboard: <Dashboard />, conferences: <ConferencesPage />, sessions: <SessionsPage />, rooms: <RoomUtilizationPage />, announcements: <AnnouncementsPage /> }[route] || <Dashboard />;
+  return <main className="app-shell"><header className="topbar"><a className="brand" href="#/dashboard">CMS <span>Organizer</span></a><nav>{Object.entries(routes).map(([key, label]) => <a className={route === key ? "active" : ""} href={`#/${key}`} key={key}>{label}</a>)}</nav></header><section className="workspace">{authError && <div className="error">{authError}</div>}{ready ? page : <Loading />}</section></main>;
+}
 
-export default App
+function Card({ label, value }) { return <div className="card"><span>{label}</span><strong>{value}</strong></div>; }
+function Metric({ label, value }) { return <div><span>{label}</span><strong>{value}</strong></div>; }
+function Panel({ title, children }) { return <section className="panel"><h2>{title}</h2>{children}</section>; }
+function Loading() { return <p className="muted">Loading...</p>; }
+
+export default App;

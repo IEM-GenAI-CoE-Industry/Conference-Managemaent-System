@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import api from "../api";
 
 type Conference = {
@@ -8,231 +8,80 @@ type Conference = {
   start_date?: string;
   end_date?: string;
   location?: string;
-  organizer_id?: number;
+  registration_fee: number;
+  seat_capacity: number;
+  registered_count: number;
+  seats_remaining: number;
 };
 
-function ConferencesPage() {
+const initialForm = {
+  name: "",
+  description: "",
+  start_date: "",
+  end_date: "",
+  location: "",
+  registration_fee: "0",
+  seat_capacity: "0",
+};
+
+function formatDate(value?: string) {
+  return value ? new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(`${value}T00:00:00`)) : "Date to be announced";
+}
+
+export default function ConferencesPage() {
   const [conferences, setConferences] = useState<Conference[]>([]);
-  const [selectedConference, setSelectedConference] =
-    useState<Conference | null>(null);
-
-  const [form, setForm] = useState({
-    name: "",
-    description: "",
-    start_date: "",
-    end_date: "",
-    location: "",
-  });
-
+  const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Load all conferences
   async function loadConferences() {
     try {
       setError("");
       const response = await api.get("/conferences/");
       setConferences(response.data);
-    } catch (err: any) {
-      setError(
-        err.response?.data?.detail || "Failed to load conferences."
-      );
+    } catch (caughtError: any) {
+      setError(caughtError.response?.data?.detail || "Unable to load conferences.");
     }
   }
 
-  // Create a conference
-  async function createConference(e: React.FormEvent) {
-    e.preventDefault();
+  useEffect(() => { loadConferences(); }, []);
 
+  async function createConference(event: FormEvent) {
+    event.preventDefault();
+    if (new Date(form.end_date) < new Date(form.start_date)) {
+      setError("The end date must be on or after the start date.");
+      return;
+    }
     try {
       setLoading(true);
       setError("");
-
-      await api.post("/conferences/", form);
-
-      setForm({
-        name: "",
-        description: "",
-        start_date: "",
-        end_date: "",
-        location: "",
+      await api.post("/conferences/", {
+        ...form,
+        registration_fee: Number(form.registration_fee),
+        seat_capacity: Number(form.seat_capacity),
       });
-
+      setForm(initialForm);
       await loadConferences();
-    } catch (err: any) {
-      setError(
-        err.response?.data?.detail || "Failed to create conference."
-      );
+    } catch (caughtError: any) {
+      setError(caughtError.response?.data?.detail || "Unable to create the conference.");
     } finally {
       setLoading(false);
     }
   }
 
-  // Load one conference
-  async function viewConference(id: number) {
-    try {
-      setError("");
-
-      const response = await api.get(`/conferences/${id}`);
-      setSelectedConference(response.data);
-    } catch (err: any) {
-      setError(
-        err.response?.data?.detail || "Failed to load conference details."
-      );
-    }
-  }
-
-  useEffect(() => {
-    loadConferences();
-  }, []);
-
-  return (
-    <div>
-      <h1>Conference Management</h1>
-
-      {error && (
-        <p style={{ color: "red" }}>
-          {error}
-        </p>
-      )}
-
-      <section>
-        <h2>Create Conference</h2>
-
-        <form onSubmit={createConference}>
-          <div>
-            <label>Conference Name</label>
-            <br />
-            <input
-              type="text"
-              value={form.name}
-              onChange={(e) =>
-                setForm({ ...form, name: e.target.value })
-              }
-              required
-            />
-          </div>
-
-          <div>
-            <label>Description</label>
-            <br />
-            <textarea
-              value={form.description}
-              onChange={(e) =>
-                setForm({ ...form, description: e.target.value })
-              }
-            />
-          </div>
-
-          <div>
-            <label>Start Date</label>
-            <br />
-            <input
-              type="date"
-              value={form.start_date}
-              onChange={(e) =>
-                setForm({ ...form, start_date: e.target.value })
-              }
-              required
-            />
-          </div>
-
-          <div>
-            <label>End Date</label>
-            <br />
-            <input
-              type="date"
-              value={form.end_date}
-              onChange={(e) =>
-                setForm({ ...form, end_date: e.target.value })
-              }
-              required
-            />
-          </div>
-
-          <div>
-            <label>Location</label>
-            <br />
-            <input
-              type="text"
-              value={form.location}
-              onChange={(e) =>
-                setForm({ ...form, location: e.target.value })
-              }
-              required
-            />
-          </div>
-
-          <br />
-
-          <button type="submit" disabled={loading}>
-            {loading ? "Creating..." : "Create Conference"}
-          </button>
-        </form>
-      </section>
-
-      <hr />
-
-      <section>
-        <h2>Conferences</h2>
-
-        {conferences.length === 0 ? (
-          <p>No conferences found.</p>
-        ) : (
-          <ul>
-            {conferences.map((conference) => (
-              <li key={conference.id}>
-                <strong>{conference.name}</strong>{" "}
-                ({conference.start_date} - {conference.end_date}){" "}
-                <button onClick={() => viewConference(conference.id)}>
-                  View Details
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {selectedConference && (
-        <>
-          <hr />
-
-          <section>
-            <h2>Conference Details</h2>
-
-            <p>
-              <strong>Name:</strong> {selectedConference.name}
-            </p>
-
-            <p>
-              <strong>Description:</strong>{" "}
-              {selectedConference.description || "N/A"}
-            </p>
-
-            <p>
-              <strong>Start Date:</strong>{" "}
-              {selectedConference.start_date || "N/A"}
-            </p>
-
-            <p>
-              <strong>End Date:</strong>{" "}
-              {selectedConference.end_date || "N/A"}
-            </p>
-
-            <p>
-              <strong>Location:</strong>{" "}
-              {selectedConference.location || "N/A"}
-            </p>
-
-            <p>
-              <strong>Organizer ID:</strong>{" "}
-              {selectedConference.organizer_id ?? "N/A"}
-            </p>
-          </section>
-        </>
-      )}
-    </div>
-  );
+  return <div className="module-page">
+    <div className="page-heading"><div><p className="eyebrow">CONFERENCE DIRECTORY</p><h1>Conferences</h1><p className="subtitle">Create and review the conferences that make up the event programme.</p></div><button className="secondary-button" onClick={loadConferences}>Refresh</button></div>
+    {error && <div className="error">{error}</div>}
+    <section className="form-panel"><h2>Create conference</h2><form className="field-grid" onSubmit={createConference}>
+      <label>Conference name<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></label>
+      <label>Location<input value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} required /></label>
+      <label>Start date<input type="date" value={form.start_date} onChange={(event) => setForm({ ...form, start_date: event.target.value })} required /></label>
+      <label>End date<input type="date" min={form.start_date} value={form.end_date} onChange={(event) => setForm({ ...form, end_date: event.target.value })} required /></label>
+      <label>Registration fee<input type="number" min="0" step="0.01" value={form.registration_fee} onChange={(event) => setForm({ ...form, registration_fee: event.target.value })} required /></label>
+      <label>Total seats<input type="number" min="0" value={form.seat_capacity} onChange={(event) => setForm({ ...form, seat_capacity: event.target.value })} required /></label>
+      <label className="span-two">Description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows={3} /></label>
+      <div className="span-two"><button disabled={loading}>{loading ? "Creating..." : "Create conference"}</button></div>
+    </form></section>
+    <section><div className="section-heading"><h2>Available conferences</h2><span>{conferences.length} listed</span></div>{conferences.length ? <div className="conference-grid">{conferences.map((conference) => <article className="conference-card" key={conference.id}><div className="card-topline"><span>#{conference.id}</span><span>{conference.seats_remaining} seats left</span></div><h3>{conference.name}</h3><p>{conference.description || "No description has been added yet."}</p><dl><div><dt>When</dt><dd>{formatDate(conference.start_date)} to {formatDate(conference.end_date)}</dd></div><div><dt>Where</dt><dd>{conference.location || "Location to be announced"}</dd></div><div><dt>Fee</dt><dd>Rs. {conference.registration_fee.toFixed(2)}</dd></div><div><dt>Seats</dt><dd>{conference.registered_count} registered of {conference.seat_capacity || "TBA"}</dd></div></dl></article>)}</div> : <p className="empty-state">No conferences are available yet.</p>}</section>
+  </div>;
 }
-
-export default ConferencesPage;
