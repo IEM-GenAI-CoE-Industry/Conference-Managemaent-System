@@ -122,7 +122,13 @@ class Payment(Base):
     registration_id = Column(Integer, ForeignKey("registrations.id"), nullable=False, unique=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     amount = Column(Float, nullable=False)
+    currency = Column(String(3), nullable=False, default="INR")
+    provider = Column(String(40), nullable=False, default="college_demo_gateway")
+    gateway_order_id = Column(String(80), unique=True, nullable=True, index=True)
+    gateway_payment_id = Column(String(80), unique=True, nullable=True, index=True)
     status = Column(String(30), nullable=False, default="pending")
+    failure_reason = Column(String(250), nullable=True)
+    refunded_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utcnow)
     confirmed_at = Column(DateTime, nullable=True)
 
@@ -176,6 +182,8 @@ class Submission(Base):
     file_url = Column(String(500), nullable=True)
     status = Column(String(50), default="submitted")
     created_at = Column(DateTime, default=datetime.utcnow)
+    camera_ready_file_url = Column(String(500), nullable=True)
+    notes = Column(Text, nullable=True)
 
 
 class Review(Base):
@@ -189,7 +197,17 @@ class Review(Base):
     recommendation = Column(String(50), nullable=True)
     comments = Column(Text, nullable=True)
     assigned_at = Column(DateTime, default=datetime.utcnow)
+    deadline = Column(DateTime, nullable=True)
     submitted_at = Column(DateTime, nullable=True)
+
+    # M-26: structured review rubric
+    originality_score = Column(Integer, nullable=True)
+    methodology_score = Column(Integer, nullable=True)
+    clarity_score = Column(Integer, nullable=True)
+    significance_score = Column(Integer, nullable=True)
+    confidence_score = Column(Integer, nullable=True)
+    confidential_comments = Column(Text, nullable=True)
+
 
 
 class Announcement(Base):
@@ -216,3 +234,30 @@ class Certificate(Base):
     issued_at = Column(DateTime, default=datetime.utcnow)
 
 
+class ConflictOfInterest(Base):
+    __tablename__ = "conflicts_of_interest"
+
+    id = Column(Integer, primary_key=True, index=True)
+    submission_id = Column(
+        Integer, ForeignKey("submissions.id"), nullable=False
+    )
+    reviewer_id = Column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+    reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+    notification_type = Column(String(50), nullable=False, default="general")
+    is_read = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")

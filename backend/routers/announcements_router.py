@@ -40,7 +40,6 @@ class AnnouncementOut(BaseModel):
     scheduled_for: Optional[datetime] = None
     delivery_channel: str
     created_by: int
-
     class Config:
         from_attributes = True
 
@@ -81,6 +80,7 @@ def get_announcements(
 ):
     if not db.query(Conference).filter(Conference.id == conference_id).first():
         raise HTTPException(404, "Conference not found")
+    
     return (
         db.query(Announcement)
         .filter(Announcement.conference_id == conference_id)

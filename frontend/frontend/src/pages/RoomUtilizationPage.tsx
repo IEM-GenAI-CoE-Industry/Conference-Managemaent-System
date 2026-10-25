@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import api from "../api";
+import "./RoomUtilizationPage.css";
 
 type Conference = { id: number; name: string };
 type RoomSession = { session_id: number; session_title: string; room: string; room_capacity: number; expected_attendees: number; utilization_pct: number; status: string };

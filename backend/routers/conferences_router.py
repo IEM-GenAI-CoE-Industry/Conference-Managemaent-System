@@ -17,6 +17,9 @@ class ConferenceCreate(BaseModel):
     location: str = Field(min_length=1, max_length=250)
     registration_fee: float = Field(default=0, ge=0)
     seat_capacity: int = Field(default=0, ge=0)
+    cfp_title: Optional[str] = None
+    cfp_description: Optional[str] = None
+    cfp_deadline: Optional[date] = None
 
     @field_validator("name", "location")
     @classmethod
@@ -39,11 +42,26 @@ class ConferenceResponse(BaseModel):
     registered_count: int = 0
     seats_remaining: int = 0
     organizer_id: Optional[int] = None
+    # Fix for M-23: CFP fields and submission link helper
+    cfp_title: Optional[str] = None
+    cfp_description: Optional[str] = None
+    cfp_deadline: Optional[str] = None
+    is_cfp_open: bool = True
+    submit_paper_url: Optional[str] = None
 
 def conference_to_response(c):
     derived_capacity = sum(session.room_capacity for session in c.sessions)
     capacity = c.seat_capacity or derived_capacity
     registered_count = len(c.registrations)
+
+    cfp_title = getattr(c, "cfp_title", None) or (
+        f"Call for Papers - {c.name}"
+    )
+    cfp_description = getattr(c, "cfp_description", None) or (
+        "Submissions are invited for original research papers in theoretical and applied tracks."
+    )
+    cfp_deadline = getattr(c, "cfp_deadline", None) or c.start_date
+
     return {
         "id": c.id,
         "name": c.name,
@@ -56,6 +74,11 @@ def conference_to_response(c):
         "registered_count": registered_count,
         "seats_remaining": max(capacity - registered_count, 0),
         "organizer_id": c.organizer_id,
+        "cfp_title": cfp_title,
+        "cfp_description": cfp_description,
+        "cfp_deadline": str(cfp_deadline),
+        "is_cfp_open": True,
+        "submit_paper_url": f"/submissions/create?conference_id={c.id}",
     }
 
 def session_to_response(s):

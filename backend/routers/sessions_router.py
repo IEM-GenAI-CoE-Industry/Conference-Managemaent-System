@@ -67,6 +67,7 @@ def session_to_response(session: models.Session) -> dict:
         "location": session.location,
         "room_capacity": session.room_capacity,
         "expected_attendees": session.expected_attendees,
+        "submission_id": getattr(session, "submission_id", None),
     }
 
 
@@ -288,6 +289,26 @@ def confirm_speaker(
     db.refresh(session)
     return session_to_response(session)
 
+
+# ==========================================
+# FIX FOR M-17: My Presentations Endpoint
+# ==========================================
+@router.get("/my-presentations")
+def get_my_presentations(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("author")),
+):
+    """
+    Fetch conference presentation slots assigned to the logged-in author's accepted submissions. (M-17)
+    """
+    author_submissions = db.query(Submission).filter(Submission.author_id == current_user.id).all()
+    sub_ids = [sub.id for sub in author_submissions]
+    
+    if not sub_ids:
+        return []
+
+    presentations = db.query(SessionModel).filter(SessionModel.submission_id.in_(sub_ids)).all()
+    return [out(p) for p in presentations]
 
 @rooms_router.get("/utilization")
 def utilization(conference_id: int, db: Session = Depends(get_db)):
