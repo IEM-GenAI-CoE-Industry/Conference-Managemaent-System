@@ -36,6 +36,8 @@ class Conference(Base):
     location = Column(String(250), nullable=True)
     start_date = Column(String(50), nullable=True)
     end_date = Column(String(50), nullable=True)
+    registration_fee = Column(Float, nullable=False, default=0.0)
+    seat_capacity = Column(Integer, nullable=False, default=0)
     organizer_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     created_at = Column(DateTime, default=utcnow)
 
@@ -215,6 +217,9 @@ class Announcement(Base):
     conference_id = Column(Integer, ForeignKey("conferences.id"), nullable=False)
     title = Column(String(255), nullable=False)
     message = Column(Text, nullable=False)
+    audience = Column(String(100), nullable=False, default="all")
+    scheduled_for = Column(DateTime, nullable=True)
+    delivery_channel = Column(String(50), nullable=False, default="in-app")
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 

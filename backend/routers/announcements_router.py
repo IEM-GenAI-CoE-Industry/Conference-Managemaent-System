@@ -1,8 +1,8 @@
-import html
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from backend.auth import get_current_user, require_role
@@ -15,29 +15,20 @@ router = APIRouter(prefix="/announcements", tags=["Announcements"])
 
 
 class AnnouncementCreate(BaseModel):
-    conference_id: int = MOCK_CONFERENCE_ID
-    title: str
-    message: str
-    
-    target_audience: Optional[str] = "all"
+    conference_id: int = Field(gt=0)
+    title: str = Field(min_length=1, max_length=255)
+    message: str = Field(min_length=1)
+    audience: str = Field(default="all", max_length=100)
+    scheduled_for: Optional[datetime] = None
+    delivery_channel: str = Field(default="in-app", max_length=50)
 
-    @validator("title", "message")
-    def validate_non_empty(cls, v: str):
-        if not v or not v.strip():
-            raise ValueError("Field cannot be empty or contain only whitespace.")
-        #return v.strip()
-        # Fix for M-43: Escape HTML entities to prevent script/HTML injection
-        return html.escape(v.strip())
-
-    @validator("target_audience")
-    def validate_audience(cls, v: Optional[str]):
-        if not v:
-            return "all"
-        clean = v.strip().lower()
-        allowed = {"all", "authors", "reviewers", "attendees", "organizers"}
-        if clean not in allowed:
-            raise ValueError(f"Target audience must be one of: {', '.join(allowed)}")
-        return clean
+    @field_validator("title", "message", "audience", "delivery_channel")
+    @classmethod
+    def reject_blank_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("This field cannot be blank")
+        return value
 
 
 class AnnouncementOut(BaseModel):
@@ -45,8 +36,10 @@ class AnnouncementOut(BaseModel):
     conference_id: int
     title: str
     message: str
+    audience: str
+    scheduled_for: Optional[datetime] = None
+    delivery_channel: str
     created_by: int
-    target_audience: str
     class Config:
         from_attributes = True
 
@@ -68,9 +61,9 @@ def create_announcement(
         conference_id=payload.conference_id,
         title=payload.title.strip(),
         message=payload.message.strip(),
-        
-        target_audience=payload.target_audience, #ADDED TARGET AUDIENCE
-        
+        audience=payload.audience,
+        scheduled_for=payload.scheduled_for,
+        delivery_channel=payload.delivery_channel,
         created_by=current_user.id,
     )
     db.add(announcement)
@@ -87,23 +80,10 @@ def get_announcements(
 ):
     if not db.query(Conference).filter(Conference.id == conference_id).first():
         raise HTTPException(404, "Conference not found")
-    # return (
-    #     db.query(Announcement)
-    #     .filter(Announcement.conference_id == conference_id)
-    #     .order_by(Announcement.created_at.desc())
-    #     .all()
-    # )
     
-    query = db.query(Announcement).filter(Announcement.conference_id == conference_id)
-
-    # Fix for M-31: Filter announcements by target audience according to user role
-    if current_user.role != "organizer":
-        query = query.filter(
-            (Announcement.target_audience == "all") | 
-            (Announcement.target_audience == current_user.role)
-        )
-
     return (
-        query.order_by(Announcement.created_at.desc())
+        db.query(Announcement)
+        .filter(Announcement.conference_id == conference_id)
+        .order_by(Announcement.created_at.desc())
         .all()
     )

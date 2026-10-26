@@ -66,6 +66,7 @@ Base.metadata.create_all(bind=engine)
 upgrade_sqlite_schema()
 ensure_demo_seed()
 
+
 app = FastAPI(title="Conference Management System", version="1.0.0", description="Working prototype for conference lifecycle management")
 app.add_middleware(
     CORSMiddleware,

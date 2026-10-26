@@ -30,7 +30,7 @@ def seed():
         db.add(conference); db.flush()
 
         s1 = Session(conference_id=conference.id, title="Opening Keynote: Future of AI", speaker_id=speaker.id, start_time=datetime(2026,10,15,10,0), end_time=datetime(2026,10,15,11,0), location="Auditorium A", room_capacity=100, expected_attendees=75, speaker_confirmed=True)
-        s2 = Session(conference_id=conference.id, title="Generative AI Workshop", speaker_id=speaker.id, start_time=datetime(2026,10,15,11,30), end_time=datetime(2026,10,15,13,0), location="Lab 1", room_capacity=40, expected_attendees=45, speaker_confirmed=False)
+        s2 = Session(conference_id=conference.id, title="Generative AI Workshop", speaker_id=speaker.id, start_time=datetime(2026,10,15,11,30), end_time=datetime(2026,10,15,13,0), location="Lab 1", room_capacity=40, expected_attendees=35, speaker_confirmed=False)
         s3 = Session(conference_id=conference.id, title="Cloud & Backend Engineering", start_time=datetime(2026,10,15,14,0), end_time=datetime(2026,10,15,15,0), location="Room B", room_capacity=80, expected_attendees=20, speaker_confirmed=False)
         db.add_all([s1,s2,s3]); db.flush()
 
