@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
-from backend.models import ConflictOfInterest, Notification, Review, Submission, User
+from backend.models import ConflictOfInterest, Notification, Review, Submission, User, ReviewDiscussionMessage
 
 router = APIRouter(prefix="/reviews", tags=["Reviews"])
 
@@ -537,4 +537,102 @@ def get_review_draft(
         "confidence_score": review.confidence_score,
         "confidential_comments": review.confidential_comments,
         "status": review.status,
+    }
+class DiscussionMessageCreate(BaseModel):
+    message: str = Field(min_length=1, max_length=3000)
+
+
+@router.get("/{submission_id}/discussion")
+def get_review_discussion(
+    submission_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    submission = db.query(Submission).filter(
+        Submission.id == submission_id
+    ).first()
+
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    if current_user.role not in ("organizer", "author", "reviewer"):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if current_user.role == "author" and submission.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if current_user.role == "reviewer":
+        assigned = db.query(Review).filter(
+            Review.submission_id == submission_id,
+            Review.reviewer_id == current_user.id,
+        ).first()
+        if not assigned:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    messages = (
+        db.query(ReviewDiscussionMessage)
+        .filter(ReviewDiscussionMessage.submission_id == submission_id)
+        .order_by(ReviewDiscussionMessage.created_at.asc())
+        .all()
+    )
+
+    return [
+        {
+            "id": item.id,
+            "submission_id": item.submission_id,
+            "user_id": item.user_id,
+            "message": item.message,
+            "created_at": item.created_at,
+        }
+        for item in messages
+    ]
+
+
+@router.post("/{submission_id}/discussion", status_code=201)
+def post_review_discussion(
+    submission_id: int,
+    payload: DiscussionMessageCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    submission = db.query(Submission).filter(
+        Submission.id == submission_id
+    ).first()
+
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    if current_user.role not in ("organizer", "author", "reviewer"):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if current_user.role == "author" and submission.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if current_user.role == "reviewer":
+        assigned = db.query(Review).filter(
+            Review.submission_id == submission_id,
+            Review.reviewer_id == current_user.id,
+        ).first()
+        if not assigned:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    message_text = payload.message.strip()
+    if not message_text:
+        raise HTTPException(status_code=422, detail="Message cannot be blank")
+
+    item = ReviewDiscussionMessage(
+        submission_id=submission_id,
+        user_id=current_user.id,
+        message=message_text,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    return {
+        "id": item.id,
+        "submission_id": item.submission_id,
+        "user_id": item.user_id,
+        "message": item.message,
+        "created_at": item.created_at,
     }
