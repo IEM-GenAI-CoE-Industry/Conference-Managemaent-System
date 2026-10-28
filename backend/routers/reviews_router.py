@@ -9,6 +9,8 @@ from backend.auth import get_current_user, require_role
 from backend.database import get_db
 from backend.models import ConflictOfInterest, Notification, Review, Submission, User, ReviewDiscussionMessage
 
+import re
+
 router = APIRouter(prefix="/reviews", tags=["Reviews"])
 
 
@@ -635,4 +637,57 @@ def post_review_discussion(
         "user_id": item.user_id,
         "message": item.message,
         "created_at": item.created_at,
+    }
+
+
+@router.get("/similarity/{submission_id}")
+def check_submission_similarity(
+    submission_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("organizer")),
+):
+    from collections import Counter
+    from math import sqrt
+
+    submission = db.query(Submission).filter(
+        Submission.id == submission_id
+    ).first()
+
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    def words(text: str) -> Counter:
+        return Counter(re.findall(r"\b[a-zA-Z0-9]+\b", text.lower()))
+
+    def cosine_similarity(a: Counter, b: Counter) -> float:
+        dot = sum(count * b.get(word, 0) for word, count in a.items())
+        norm_a = sqrt(sum(value * value for value in a.values()))
+        norm_b = sqrt(sum(value * value for value in b.values()))
+        return dot / (norm_a * norm_b) if norm_a and norm_b else 0.0
+
+    target_text = words(f"{submission.title} {submission.abstract}")
+    others = db.query(Submission).filter(
+        Submission.conference_id == submission.conference_id,
+        Submission.id != submission_id,
+    ).all()
+
+    matches = []
+    for other in others:
+        other_text = words(f"{other.title} {other.abstract}")
+        score = cosine_similarity(target_text, other_text) * 100
+        if score >= 30:
+            matches.append({
+                "submission_id": other.id,
+                "title": other.title,
+                "similarity_percent": round(score, 2),
+                "flagged": score >= 60,
+            })
+
+    matches.sort(key=lambda item: item["similarity_percent"], reverse=True)
+
+    return {
+        "submission_id": submission_id,
+        "method": "TF cosine similarity on title and abstract",
+        "notice": "Similarity screening only; flagged matches require human review and do not prove plagiarism.",
+        "matches": matches,
     }
