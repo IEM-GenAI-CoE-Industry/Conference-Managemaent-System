@@ -173,6 +173,68 @@ def get_my_certificates(
         .all()
     )
 
+class CertificateTemplateSchema(BaseModel):
+    title: str
+    body: str
+    theme: str
+
+@router.get("/template/{conference_id}")
+def get_certificate_template(
+    conference_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("organizer")),
+):
+    conference = db.query(Conference).filter(
+        Conference.id == conference_id
+    ).first()
+
+    if not conference:
+        raise HTTPException(status_code=404, detail="Conference not found")
+
+    return {
+        "conference_id": conference.id,
+        "title": getattr(conference, "certificate_title", None)
+        or "CERTIFICATE OF PARTICIPATION",
+        "body": getattr(conference, "certificate_body", None)
+        or "This certificate is presented to",
+        "theme": getattr(conference, "certificate_theme", None)
+        or "#24476B",
+    }
+
+@router.put("/template/{conference_id}")
+def save_certificate_template(
+    conference_id: int,
+    payload: CertificateTemplateSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("organizer")),
+):
+    conference = db.query(Conference).filter(
+        Conference.id == conference_id
+    ).first()
+
+    if not conference:
+        raise HTTPException(status_code=404, detail="Conference not found")
+
+    if not payload.title.strip() or not payload.body.strip():
+        raise HTTPException(status_code=400, detail="Title and body are required")
+
+    if not payload.theme.startswith("#") or len(payload.theme) != 7:
+        raise HTTPException(status_code=400, detail="Theme must be a hex color")
+
+    conference.certificate_title = payload.title.strip()[:200]
+    conference.certificate_body = payload.body.strip()
+    conference.certificate_theme = payload.theme
+
+    db.commit()
+    db.refresh(conference)
+
+    return {
+        "message": "Certificate template saved",
+        "conference_id": conference.id,
+        "title": conference.certificate_title,
+        "body": conference.certificate_body,
+        "theme": conference.certificate_theme,
+    }
 
 @router.get("/preview/{conference_id}")
 def preview_certificate(
@@ -263,27 +325,40 @@ def download_certificate_pdf(
     pdf = canvas.Canvas(buffer, pagesize=landscape(A4))
     width, height = landscape(A4)
 
+        # Load saved certificate template settings, with defaults
+    certificate_title = (
+        getattr(conference, "certificate_title", None)
+        or "CERTIFICATE OF PARTICIPATION"
+    )
+    certificate_body = (
+        getattr(conference, "certificate_body", None)
+        or "This certificate is presented to"
+    )
+    certificate_theme = (
+        getattr(conference, "certificate_theme", None)
+        or "#24476B"
+    )
+
     # Certificate border and heading
-    pdf.setStrokeColor(colors.HexColor("#24476B"))
+    pdf.setStrokeColor(colors.HexColor(certificate_theme))
     pdf.setLineWidth(4)
     pdf.rect(30, 30, width - 60, height - 60)
 
-    pdf.setFillColor(colors.HexColor("#24476B"))
+    pdf.setFillColor(colors.HexColor(certificate_theme))
     pdf.setFont("Helvetica-Bold", 27)
-    pdf.drawCentredString(width / 2, height - 115, "CERTIFICATE OF PARTICIPATION")
+    pdf.drawCentredString(
+        width / 2, height - 115, certificate_title[:100]
+    )
 
     pdf.setFillColor(colors.black)
     pdf.setFont("Helvetica", 16)
-    pdf.drawCentredString(width / 2, height - 170, "This certificate is presented to")
+    pdf.drawCentredString(
+        width / 2, height - 170, certificate_body[:150]
+    )
 
-    pdf.setFillColor(colors.HexColor("#24476B"))
+    pdf.setFillColor(colors.HexColor(certificate_theme))
     pdf.setFont("Helvetica-Bold", 24)
     pdf.drawCentredString(width / 2, height - 220, str(recipient_name)[:100])
-
-    pdf.setFillColor(colors.black)
-    pdf.setFont("Helvetica", 14)
-    pdf.drawCentredString(width / 2, height - 265, "for participating in")
-
     pdf.setFont("Helvetica-Bold", 19)
     pdf.drawCentredString(width / 2, height - 300, str(conference_name)[:120])
 

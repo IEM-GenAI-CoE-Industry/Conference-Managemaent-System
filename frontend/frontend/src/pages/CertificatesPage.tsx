@@ -37,6 +37,23 @@ export default function CertificatesPage() {
       setCerts(c.data);
       setEligible(o.data);
 
+      const savedConferenceId =
+  o.data.length > 0 ? o.data[0].conference_id : null;
+
+if (organizer && savedConferenceId !== null) {
+  try {
+    const template = await api.get(
+      `/certificates/template/${savedConferenceId}`
+    );
+
+    setTitle(template.data.title);
+    setBody(template.data.body);
+    setTheme(template.data.theme);
+  } catch {
+    // Keep the default template if loading fails.
+  }
+}
+
       if (o.data.length > 0) {
         setChoice((previous) =>
           previous || `${o.data[0].conference_id}:${o.data[0].user_id}`
@@ -80,6 +97,26 @@ export default function CertificatesPage() {
       await load();
     } catch (e: any) {
       setMessage(e.response?.data?.detail || "Bulk generation failed.");
+    }
+  };
+
+    const saveTemplate = async () => {
+    if (!bulkConference) {
+      setMessage("Select a conference before saving the template.");
+      return;
+    }
+
+    try {
+      await api.put(`/certificates/template/${Number(bulkConference)}`, {
+        title,
+        body,
+        theme,
+      });
+      setMessage("Certificate template saved successfully.");
+    } catch (e: any) {
+      setMessage(
+        e.response?.data?.detail || "Could not save certificate template."
+      );
     }
   };
 
@@ -169,11 +206,13 @@ export default function CertificatesPage() {
             </div>
 
             <p style={s.muted}>
-              This preview is local to this page. The current backend PDF
-              endpoint uses a fixed design; these edits are not saved or
-              applied to downloaded PDFs yet.
+              Save your template to apply the design to downloaded certificates.
             </p>
           </section>
+
+          <button onClick={saveTemplate} style={s.button}>
+            Save Template
+          </button>
 
           <section style={s.card}>
             <h2>Issue an eligible certificate</h2>
