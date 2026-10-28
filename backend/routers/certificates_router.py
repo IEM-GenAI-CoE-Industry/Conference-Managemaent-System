@@ -313,3 +313,55 @@ def download_certificate_pdf(
             )
         },
     )
+
+@router.post("/bulk-generate/{conference_id}")
+def bulk_generate_certificates(
+    conference_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("organizer")),
+):
+    conference = db.query(Conference).filter(
+        Conference.id == conference_id
+    ).first()
+
+    if not conference:
+        raise HTTPException(status_code=404, detail="Conference not found")
+
+    attended = (
+        db.query(Attendance.user_id)
+        .join(SessionModel, Attendance.session_id == SessionModel.id)
+        .filter(
+            SessionModel.conference_id == conference_id,
+            Attendance.attended.is_(True),
+        )
+        .distinct()
+        .all()
+    )
+
+    issued = []
+    for (user_id,) in attended:
+        existing = db.query(Certificate).filter(
+            Certificate.user_id == user_id,
+            Certificate.conference_id == conference_id,
+        ).first()
+
+        if existing:
+            continue
+
+        cert = Certificate(
+            user_id=user_id,
+            conference_id=conference_id,
+            certificate_uuid=(
+                f"CERT-CONF{conference_id}-2026-{uuid.uuid4().hex[:6].upper()}"
+            ),
+        )
+        db.add(cert)
+        issued.append(cert)
+
+    db.commit()
+
+    return {
+        "conference_id": conference_id,
+        "new_certificates_issued": len(issued),
+        "message": "Bulk certificate generation completed.",
+    }
