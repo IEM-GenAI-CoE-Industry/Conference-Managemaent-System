@@ -57,6 +57,11 @@ def upgrade_sqlite_schema() -> None:
             "failure_reason": "VARCHAR(250)",
             "refunded_at": "DATETIME",
         },
+	"conferences": {
+    		"certificate_title": "VARCHAR(200)",
+    		"certificate_body": "TEXT",
+    		"certificate_theme": "VARCHAR(7)",
+	},
 
     }
 

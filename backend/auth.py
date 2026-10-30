@@ -6,7 +6,7 @@ import jwt
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
@@ -44,13 +44,21 @@ def create_access_token(user_id: int, role: str) -> str:
 class RegisterRequest(BaseModel):
     name: str = Field(min_length=2, max_length=100)
     email: EmailStr
-    password: str = Field(min_length=6)
-    role: str = "participant"
+    password: str = Field(min_length=1, max_length=128)
+    role: Literal["participant", "author", "reviewer", "speaker"] = "participant"
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        value = value.strip()
+        if len(value) < 2:
+            raise ValueError("Name must contain at least 2 non-space characters")
+        return value
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=1, max_length=128)
     role: Literal["organizer", "participant", "author", "reviewer", "speaker"] | None = None
 
 

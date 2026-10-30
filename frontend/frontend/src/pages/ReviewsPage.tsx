@@ -76,6 +76,45 @@ export function ReviewsPage() {
     { review_id: number; reviewer_id: number; confidential_comments: string | null }[]
   >([]);
   const [searchSubmissionId, setSearchSubmissionId] = useState<string>('');
+  const [discussionMessages, setDiscussionMessages] = useState<
+  { id: number; user_id: number; message: string; created_at: string }[]
+>([]);
+const [discussionText, setDiscussionText] = useState('');
+const [discussionSubmissionId, setDiscussionSubmissionId] = useState('');
+const [discussionMessage, setDiscussionMessage] = useState('');
+
+const fetchDiscussion = async () => {
+  try {
+    const id = Number(discussionSubmissionId);
+    if (!Number.isInteger(id) || id < 1) {
+      setDiscussionMessage('Enter a valid submission ID.');
+      return;
+    }
+    const response = await api.get(`/reviews/${id}/discussion`);
+    setDiscussionMessages(response.data);
+    setDiscussionMessage('');
+  } catch {
+    setDiscussionMessage('Could not load discussion. Check your access and submission ID.');
+  }
+};
+
+const postDiscussion = async () => {
+  try {
+    const id = Number(discussionSubmissionId);
+    if (!Number.isInteger(id) || id < 1 || !discussionText.trim()) {
+      setDiscussionMessage('Enter a valid submission ID and message.');
+      return;
+    }
+    await api.post(`/reviews/${id}/discussion`, {
+      message: discussionText.trim(),
+    });
+    setDiscussionText('');
+    await fetchDiscussion();
+    setDiscussionMessage('Message posted.');
+  } catch {
+    setDiscussionMessage('Could not post message. Check your access.');
+  }
+};
 
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [deadlineFilter, setDeadlineFilter] = useState<string>('all');
@@ -1151,6 +1190,75 @@ export function ReviewsPage() {
             )}
           </div>
         )}
+                <section
+          style={{
+            marginTop: 24,
+            padding: 24,
+            background: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            borderRadius: 12,
+          }}
+        >
+          <h2 style={{ color: '#0F172A' }}>Submission Discussion</h2>
+          <p style={{ color: '#64748B' }}>
+            Discuss a paper with users who have permission to access it.
+          </p>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input
+              type="number"
+              min={1}
+              placeholder="Submission ID"
+              value={discussionSubmissionId}
+              onChange={(e) => setDiscussionSubmissionId(e.target.value)}
+              style={{ ...formInputStyle, maxWidth: 220 }}
+            />
+            <button type="button" onClick={() => void fetchDiscussion()} style={buttonStyle}>
+              Load Discussion
+            </button>
+          </div>
+
+          {discussionMessages.map((item) => (
+            <div
+              key={item.id}
+              style={{
+                marginTop: 12,
+                padding: 12,
+                background: '#F8FAFC',
+                borderRadius: 8,
+                overflowWrap: 'anywhere',
+              }}
+            >
+              <div style={{ fontSize: 12, color: '#64748B' }}>
+                User #{item.user_id} · {new Date(item.created_at).toLocaleString()}
+              </div>
+              <div style={{ marginTop: 6, color: '#0F172A', whiteSpace: 'pre-wrap' }}>
+                {item.message}
+              </div>
+            </div>
+          ))}
+
+          <textarea
+            value={discussionText}
+            onChange={(e) => setDiscussionText(e.target.value)}
+            placeholder="Write a discussion message..."
+            maxLength={3000}
+            rows={3}
+            style={{ ...formInputStyle, marginTop: 16, resize: 'vertical' }}
+          />
+
+          <button
+            type="button"
+            onClick={() => void postDiscussion()}
+            style={{ ...buttonStyle, marginTop: 8 }}
+          >
+            Post Message
+          </button>
+
+          {discussionMessage && (
+            <p role="status" style={{ color: '#475569' }}>{discussionMessage}</p>
+          )}
+        </section>
       </div>
     </div>
   );

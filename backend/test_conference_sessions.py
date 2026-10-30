@@ -13,7 +13,7 @@ from backend.models import User
 
 
 def run():
-    with TemporaryDirectory() as temp_dir:
+    with TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
         database_path = Path(temp_dir) / "sessions-test.db"
         engine = create_engine(
             f"sqlite:///{database_path}",
@@ -137,5 +137,5 @@ def run():
     print("CONFERENCE AND SESSION SAFEGUARDS PASSED")
 
 
-if __name__ == "__main__":
+def test_conference_session_safeguards():
     run()

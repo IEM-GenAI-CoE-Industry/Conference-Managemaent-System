@@ -349,7 +349,23 @@ def suggestions(conference_id: int, db: Session = Depends(get_db)):
         for candidate in sessions:
             if candidate.id == crowded.id or candidate.room_capacity < crowded.expected_attendees:
                 continue
-            if time_ranges_overlap(crowded.start_time, crowded.end_time, candidate.start_time, candidate.end_time):
+            if time_ranges_overlap(
+                    crowded.start_time,
+                    crowded.end_time,
+                    candidate.start_time,
+                    candidate.end_time,
+                ):
+                continue
+
+            room_conflicts = find_conflicting_sessions(
+                db,
+                conference.id,
+                crowded.start_time,
+                crowded.end_time,
+                location=candidate.location,
+                excluded_session_id=crowded.id,
+            )
+            if room_conflicts:
                 continue
             suggestions_list.append({
                 "session_id": crowded.id,
