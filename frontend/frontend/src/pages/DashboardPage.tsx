@@ -19,7 +19,8 @@ export default function DashboardPage() {
     }
 
     try {
-      const res = await api.get('/dashboard/stats?conference_id=1');
+      const conferenceId = localStorage.getItem('selected_conference_id');
+      const res = await api.get('/dashboard/stats', { params: conferenceId ? { conference_id: Number(conferenceId) } : {} });
       setStats(res.data);
       setError('');
     } catch (err) {

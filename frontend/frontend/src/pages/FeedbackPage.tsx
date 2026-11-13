@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import api from '../api';
 
-const CONFERENCE_ID = 1;
 
 export default function FeedbackPage() {
-  const [sessionId, setSessionId] = useState('1');
+  const [sessionId, setSessionId] = useState('');
+  const [conferenceId, setConferenceId] = useState(localStorage.getItem('selected_conference_id') || '');
+  const [sessions, setSessions] = useState([]);
   const [rating, setRating] = useState(5);
   const [comments, setComments] = useState('');
   const [feedbackList, setFeedbackList] = useState([]);
@@ -15,14 +16,19 @@ export default function FeedbackPage() {
   const [loading, setLoading] = useState(false);
   const role = localStorage.getItem('role');
 
-  useEffect(() => { loadFeedback(); }, []);
+  useEffect(() => { if (conferenceId) { loadFeedback(); loadSessions(); } }, [conferenceId]);
+
+  async function loadSessions() {
+    try { const res = await api.get('/sessions/'); const rows = Array.isArray(res.data) ? res.data : (res.data?.sessions ?? []); setSessions(rows.filter(s => !conferenceId || String(s.conference_id) === String(conferenceId))); }
+    catch (err) { setError(err.response?.data?.detail || err.message || 'Unable to load sessions.'); }
+  }
 
   async function loadFeedback() {
     setLoading(true);
     setError('');
     setSummaryError('');
     try {
-      const res = await api.get(`/feedback/?conference_id=${CONFERENCE_ID}`);
+      const res = await api.get(`/feedback/?conference_id=${Number(conferenceId)}`);
       setFeedbackList(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       setError(err.response?.data?.detail || err.message || 'Failed to load feedback');
@@ -32,7 +38,7 @@ export default function FeedbackPage() {
 
     if (role === 'organizer') {
       try {
-        const sum = await api.get(`/feedback/summary?conference_id=${CONFERENCE_ID}`);
+        const sum = await api.get(`/feedback/summary?conference_id=${Number(conferenceId)}`);
         setSummary(sum.data);
       } catch (err) {
         setSummary(null);
@@ -66,8 +72,18 @@ export default function FeedbackPage() {
         {success && <div style={styles.success}>{success}</div>}
         <form onSubmit={handleSubmit}>
           <div style={styles.field}>
-            <label>Session ID</label>
-            <input type="number" value={sessionId} onChange={e => setSessionId(e.target.value)} required style={styles.input} />
+            <label>Conference</label>
+            <select value={conferenceId} onChange={e => { setConferenceId(e.target.value); localStorage.setItem('selected_conference_id', e.target.value); }} required style={styles.input}>
+              <option value="">Choose a conference</option>
+              {Array.from(new Map(sessions.map(s => [String(s.conference_id), s])).values()).map(s => <option key={s.conference_id} value={s.conference_id}>Conference #{s.conference_id}</option>)}
+            </select>
+          </div>
+          <div style={styles.field}>
+            <label>Session</label>
+            <select value={sessionId} onChange={e => setSessionId(e.target.value)} required style={styles.input}>
+              <option value="">Choose an attended session</option>
+              {sessions.map(s => <option key={s.id} value={s.id}>{s.title || `Session #${s.id}`}</option>)}
+            </select>
           </div>
           <div style={styles.field}>
             <label>Rating (1-5 stars)</label>
@@ -135,9 +151,9 @@ export default function FeedbackPage() {
 }
 
 const styles = {
-  page: { padding: 32, background: '#f9fafb', minHeight: '100vh' },
-  title: { fontSize: 26, fontWeight: 700, color: '#111827', marginBottom: 24 },
-  card: { background: '#fff', borderRadius: 10, padding: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', marginBottom: 24 },
+  page: { padding: 32, background: 'transparent', minHeight: '100vh', color: '#e2e8f0' },
+  title: { fontSize: 26, fontWeight: 700, color: '#f8fafc', marginBottom: 24 },
+  card: { background: 'linear-gradient(145deg, rgba(15,23,42,0.96), rgba(30,41,59,0.88))', color: '#e2e8f0', border: '1px solid rgba(148,163,184,0.2)', borderRadius: 10, padding: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.18)', marginBottom: 24 },
   sectionTitle: { fontSize: 16, fontWeight: 600, color: '#374151', marginBottom: 16 },
   field: { marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 6 },
   input: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 },

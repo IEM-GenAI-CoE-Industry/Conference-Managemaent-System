@@ -34,6 +34,9 @@ function ConferencesPage() {
       setError("");
       const response = await api.get("/conferences/");
       setConferences(response.data);
+      if (!localStorage.getItem("selected_conference_id") && response.data?.length) {
+        localStorage.setItem("selected_conference_id", String(response.data[0].id));
+      }
     } catch (err: any) {
       setError(
         err.response?.data?.detail || "Failed to load conferences."
@@ -76,6 +79,7 @@ function ConferencesPage() {
 
       const response = await api.get(`/conferences/${id}`);
       setSelectedConference(response.data);
+      localStorage.setItem("selected_conference_id", String(response.data.id));
     } catch (err: any) {
       setError(
         err.response?.data?.detail || "Failed to load conference details."
@@ -167,7 +171,7 @@ function ConferencesPage() {
           <h2 style={styles.sectionTitle}>Conferences</h2>
 
           {conferences.length === 0 ? (
-            <p style={styles.emptyState}>No conferences found.</p>
+            <p style={styles.emptyState}>{error ? "Unable to display conferences until the request succeeds." : "No conferences found. An organizer can create the first conference."}</p>
           ) : (
             <ul style={styles.list}>
               {conferences.map((conference) => (
@@ -178,9 +182,16 @@ function ConferencesPage() {
                       {conference.start_date} - {conference.end_date}
                     </div>
                   </div>
-                  <button onClick={() => viewConference(conference.id)} style={styles.secondaryButton}>
-                    View Details
-                  </button>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button onClick={() => viewConference(conference.id)} style={styles.secondaryButton}>View Details</button>
+                    {!isOrganizer && <button onClick={async () => {
+                      try {
+                        localStorage.setItem("selected_conference_id", String(conference.id));
+                        await api.post("/registrations/", { conference_id: conference.id, category: localStorage.getItem("role") || "participant" });
+                        setError("Registration successful for " + conference.name + ".");
+                      } catch (err: any) { setError(err?.response?.data?.detail || err?.message || "Unable to register. Please try again."); }
+                    }} style={styles.secondaryButton}>Register</button>}
+                  </div>
                 </li>
               ))}
             </ul>

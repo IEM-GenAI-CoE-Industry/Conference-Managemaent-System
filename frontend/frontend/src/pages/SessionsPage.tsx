@@ -27,6 +27,8 @@ function SessionsPage() {
   const [conferenceId, setConferenceId] = useState("");
   const [agenda, setAgenda] = useState<AgendaResponse | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [conferences, setConferences] = useState<Array<{id:number; name?:string; title?:string}>>([]);
+  const [speakers, setSpeakers] = useState<Array<{id:number; name?:string; username?:string}>>([]);
 
   const [form, setForm] = useState({
     conference_id: "",
@@ -72,6 +74,18 @@ function SessionsPage() {
       setLoading(true);
       setError("");
 
+      if (new Date(form.end_time) <= new Date(form.start_time)) {
+        setError("End time must be later than start time."); return;
+      }
+      if (form.expected_attendees && Number(form.expected_attendees) > Number(form.room_capacity)) {
+        setError("Expected attendees cannot exceed room capacity."); return;
+      }
+      if (new Date(form.end_time) <= new Date(form.start_time)) {
+        setError("End time must be later than start time."); return;
+      }
+      if (form.expected_attendees && Number(form.expected_attendees) > Number(form.room_capacity)) {
+        setError("Expected attendees cannot exceed room capacity."); return;
+      }
       const payload = {
         conference_id: Number(form.conference_id),
         title: form.title,
@@ -118,7 +132,7 @@ function SessionsPage() {
     const speakerId = assignSpeakerIds[sessionId];
 
     if (!speakerId) {
-      setError("Please enter a speaker ID.");
+      setError("Please choose a speaker from the list.");
       return;
     }
 
@@ -152,6 +166,16 @@ function SessionsPage() {
   }
 
   useEffect(() => {
+    api.get("/conferences/").then((res) => {
+      const list = res.data ?? []; setConferences(list);
+      const saved = localStorage.getItem("selected_conference_id");
+      const selected = list.some((c: any) => String(c.id) === saved) ? saved : (list[0] ? String(list[0].id) : "");
+      if (selected) { setConferenceId(selected); setForm((f) => ({ ...f, conference_id: f.conference_id || selected })); }
+    }).catch(() => setError("Unable to load conferences. You can retry by refreshing the page."));
+    api.get("/users/speakers").then((res) => setSpeakers(res.data ?? [])).catch(() => setSpeakers([]));
+  }, []);
+
+  useEffect(() => {
     if (form.conference_id) {
       setConferenceId(form.conference_id);
     }
@@ -165,9 +189,9 @@ function SessionsPage() {
       {isOrganizer && <section style={styles.section}>
         <h2 style={styles.sectionTitle}>Create Session</h2>
         <form onSubmit={createSession} style={styles.form}>
-          <label style={styles.label}>Conference ID<input style={styles.input} type="number" min="1" value={form.conference_id} onChange={(e) => setForm({ ...form, conference_id: e.target.value })} required /></label>
+          <label style={styles.label}>Conference<select style={styles.input} value={form.conference_id} onChange={(e) => { setForm({ ...form, conference_id: e.target.value }); localStorage.setItem("selected_conference_id", e.target.value); }} required><option value="">Select conference</option>{conferences.map(c => <option key={c.id} value={c.id}>{c.name || c.title || `Conference #${c.id}`}</option>)}</select></label>
           <label style={{ ...styles.label, gridColumn: "1 / -1" }}>Session Title<input style={styles.input} type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required /></label>
-          <label style={styles.label}>Speaker ID (optional)<input style={styles.input} type="number" min="1" value={form.speaker_id} onChange={(e) => setForm({ ...form, speaker_id: e.target.value })} /></label>
+          <label style={styles.label}>Speaker (optional)<select style={styles.input} value={form.speaker_id} onChange={(e) => setForm({ ...form, speaker_id: e.target.value })}><option value="">Unassigned</option>{speakers.map(sp => <option key={sp.id} value={sp.id}>{sp.name || sp.username || `Speaker #${sp.id}`}</option>)}</select></label>
           <label style={styles.label}>Start Time<input style={styles.input} type="datetime-local" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} required /></label>
           <label style={styles.label}>End Time<input style={styles.input} type="datetime-local" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} required /></label>
           <label style={styles.label}>Room Name<input style={styles.input} type="text" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} required /></label>
@@ -180,7 +204,7 @@ function SessionsPage() {
       <section style={styles.section}>
         <h2 style={styles.sectionTitle}>View Conference Agenda</h2>
         <form onSubmit={handleLoadAgenda} style={styles.agendaForm}>
-          <label style={styles.label}>Conference ID<input style={styles.input} type="number" min="1" placeholder="Enter conference ID" value={conferenceId} onChange={(e) => setConferenceId(e.target.value)} required /></label>
+          <label style={styles.label}>Conference<select style={styles.input} value={conferenceId} onChange={(e) => { setConferenceId(e.target.value); localStorage.setItem("selected_conference_id", e.target.value); }} required><option value="">Select conference</option>{conferences.map(c => <option key={c.id} value={c.id}>{c.name || c.title || `Conference #${c.id}`}</option>)}</select></label>
           <button type="submit" style={styles.secondaryButton}>Load Agenda</button>
         </form>
         {agenda && (
@@ -195,7 +219,7 @@ function SessionsPage() {
                     <p style={styles.sessionMeta}>Room: {session.location} · Capacity: {session.room_capacity} · Expected: {session.expected_attendees ?? "N/A"}</p>
                     <p style={styles.sessionMeta}>Speaker: {session.speaker_id ?? "Not assigned"}</p>
                     {isOrganizer && <div style={styles.assignForm}>
-                      <input style={styles.input} type="number" min="1" placeholder="Speaker ID" value={assignSpeakerIds[session.id] || ""} onChange={(e) => setAssignSpeakerIds({ ...assignSpeakerIds, [session.id]: e.target.value })} />
+                      <select aria-label={`Speaker for ${session.title}`} style={styles.input} value={assignSpeakerIds[session.id] || ""} onChange={(e) => setAssignSpeakerIds({ ...assignSpeakerIds, [session.id]: e.target.value })}><option value="">Choose speaker</option>{speakers.map(sp => <option key={sp.id} value={sp.id}>{sp.name || sp.username || `Speaker #${sp.id}`}</option>)}</select>
                       <button type="button" style={styles.secondaryButton} onClick={() => assignSpeaker(session.id)}>Assign Speaker</button>
                     </div>}
                   </li>

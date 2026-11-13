@@ -77,3 +77,10 @@ export function roleHome(role: string | null): string {
   if (role === "speaker") return "/sessions";
   return "/conferences";
 }
+
+/** Deny unknown routes by default; use the same policy for route and nav visibility. */
+export function getAllowedRoles(path: string): readonly AppRole[] { return routeRoles[path] ?? []; }
+export function canAccessRoute(path: string, role: string | null): boolean {
+  return isAppRole(role) && getAllowedRoles(path).includes(role);
+}
+export function canSeeNavigationItem(path: string, role: string | null): boolean { return canAccessRoute(path, role); }

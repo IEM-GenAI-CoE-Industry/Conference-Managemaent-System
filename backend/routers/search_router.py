@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
+from backend.auth import get_current_user
 from backend.models import Conference, Session as SessionModel, User
 
 router = APIRouter(prefix="/search", tags=["Search"])
@@ -14,6 +15,7 @@ def global_search(
     q: str,
     type: Optional[str] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, List[Any]]:
     if not q.strip():
         raise HTTPException(400, "Search query cannot be empty")
@@ -82,7 +84,6 @@ def global_search(
             {
                 "id": sp.id,
                 "name": sp.name,
-                "email": sp.email,
                 "role": sp.role,
             }
             for sp in speakers

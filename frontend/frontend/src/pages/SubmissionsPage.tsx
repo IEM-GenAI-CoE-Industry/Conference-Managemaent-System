@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-const API = 'http://127.0.0.1:8000';
+import api from '../api';
 
 interface Submission {
   id: number;
@@ -23,8 +22,9 @@ interface FormState {
 
 export function SubmissionsPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [conferences, setConferences] = useState<Array<{ id: number; name?: string; title?: string }>>([]);
   const [form, setForm] = useState<FormState>({
-    conference_id: 1,
+    conference_id: Number(localStorage.getItem("selected_conference_id") || 0),
     title: '',
     abstract: '',
     keywords: '',
@@ -36,21 +36,12 @@ export function SubmissionsPage() {
 
   const fetchMySubmissions = async () => {
     try {
-      const token = localStorage.getItem('token') || '';
-      if (!token) {
+      if (!localStorage.getItem('token')) {
         setMessage('Please sign in to view your submissions.');
         return;
       }
-      const res = await fetch(`${API}/submissions/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSubmissions(Array.isArray(data) ? data : []);
-      } else {
-        const errData = await res.json();
-        setMessage(`Error: ${errData.detail || 'Not authenticated'}`);
-      }
+      const response = await api.get('/submissions/me');
+      setSubmissions(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       console.error(err);
     }
@@ -58,6 +49,16 @@ export function SubmissionsPage() {
 
   useEffect(() => {
     fetchMySubmissions();
+    api.get('/conferences/').then((response) => {
+      const items = Array.isArray(response.data) ? response.data : [];
+      setConferences(items);
+      const saved = localStorage.getItem('selected_conference_id');
+      const selected = items.find((conference) => String(conference.id) === saved) || items[0];
+      if (selected) {
+        setForm((current) => ({ ...current, conference_id: selected.id }));
+        localStorage.setItem('selected_conference_id', String(selected.id));
+      }
+    }).catch(() => setMessage('Unable to load conferences. Please refresh and try again.'));
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,20 +66,10 @@ export function SubmissionsPage() {
     setLoading(true);
     setMessage('');
     try {
-      const token = localStorage.getItem('token') || '';
-      const res = await fetch(`${API}/submissions/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(form)
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Submission failed');
+      await api.post('/submissions/', form);
 
       setMessage('Paper submitted successfully!');
-      setForm({ conference_id: 1, title: '', abstract: '', keywords: '', file_url: '' });
+      setForm({ conference_id: Number(localStorage.getItem("selected_conference_id") || 0), title: '', abstract: '', keywords: '', file_url: '' });
       fetchMySubmissions();
     } catch (err: any) {
       setMessage(`Error: ${err.message}`);
@@ -91,17 +82,7 @@ export function SubmissionsPage() {
     const cameraUrl = cameraReadyUrls[submissionId];
     if (!cameraUrl) return;
     try {
-      const token = localStorage.getItem('token') || '';
-      const res = await fetch(`${API}/submissions/${submissionId}/camera-ready`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ camera_ready_file_url: cameraUrl })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Upload failed');
+      await api.post(`/submissions/${submissionId}/camera-ready`, { camera_ready_file_url: cameraUrl });
       setMessage(`Camera-ready submitted for paper #${submissionId}!`);
       fetchMySubmissions();
     } catch (err: any) {
@@ -173,14 +154,24 @@ export function SubmissionsPage() {
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '600px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>Conference ID</label>
-              <input
-                type="number"
-                value={form.conference_id}
-                onChange={(e) => setForm({ ...form, conference_id: Number(e.target.value) })}
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>Conference</label>
+              <select
+                value={form.conference_id || ''}
+                onChange={(e) => {
+                  const conferenceId = Number(e.target.value);
+                  setForm({ ...form, conference_id: conferenceId });
+                  localStorage.setItem('selected_conference_id', String(conferenceId));
+                }}
                 required
                 style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.875rem', outline: 'none' }}
-              />
+              >
+                <option value="">Select a conference</option>
+                {conferences.map((conference) => (
+                  <option key={conference.id} value={conference.id}>
+                    {conference.name || conference.title || `Conference #${conference.id}`}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>

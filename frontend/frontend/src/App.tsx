@@ -24,7 +24,7 @@ import AttendancePage from "./pages/AttendancePage";
 import BottleneckPage from "./pages/BottleneckPage.tsx";
 import CertificateVerificationPage from "./pages/CertificateVerificationPage";
 import ProfilePage from "./pages/ProfilePage";
-import { type AppRole, roleHome, routeRoles } from "./access";
+import { canAccessRoute, roleHome } from "./access";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return localStorage.getItem("token") ? children : <Navigate replace to="/login" />;
@@ -32,8 +32,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function RoleRoute({ path, children }: { path: string; children: React.ReactNode }) {
   const role = localStorage.getItem("role");
-  const allowedRoles = routeRoles[path];
-  return allowedRoles?.includes(role as AppRole)
+  return canAccessRoute(path, role)
     ? children
     : <Navigate replace to={roleHome(role)} />;
 }

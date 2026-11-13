@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Callable, Literal
 import hashlib
 import secrets
+import os
 import jwt
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -12,7 +13,7 @@ from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.models import User
 
-SECRET_KEY = "conference-demo-secret-change-before-production"
+SECRET_KEY = os.getenv("CMS_SECRET_KEY", "development-only-change-this-secret")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../api';
 
-const CONFERENCE_ID = 1;
+const getSelectedConferenceId = () => Number(localStorage.getItem("selected_conference_id") || 0);
 
 export default function CertificatesPage() {
   const [certificates, setCertificates] = useState([]);
@@ -24,7 +24,9 @@ export default function CertificatesPage() {
   async function handleGenerate() {
     setError(''); setSuccess('');
     try {
-      await api.post('/certificates/generate', { conference_id: CONFERENCE_ID });
+      const conferenceId = getSelectedConferenceId();
+      if (!conferenceId) { setError('Choose a conference on the Conferences page first.'); return; }
+      await api.post('/certificates/generate', { conference_id: conferenceId });
       setSuccess('Certificate generated!');
       loadCertificates();
     } catch (err) {
@@ -51,8 +53,8 @@ export default function CertificatesPage() {
         <h2 style={styles.sectionTitle}>Generate Certificate</h2>
         {error && <div style={styles.error}>{error}</div>}
         {success && <div style={styles.success}>{success}</div>}
-        <p style={{ color: '#6b7280', marginBottom: 16, fontSize: 14 }}>
-          Generate a certificate for your attendance at conference #{CONFERENCE_ID}
+        <p style={{ color: '#cbd5e1', marginBottom: 16, fontSize: 14 }}>
+          Generate a certificate for the conference selected on the Conferences page. Eligibility is checked by the server against conference attendance and certificate rules.
         </p>
         <button onClick={handleGenerate} style={styles.button}>🎓 Generate Certificate</button>
       </div>

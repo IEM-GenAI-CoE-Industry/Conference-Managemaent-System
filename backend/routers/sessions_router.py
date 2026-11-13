@@ -3,7 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from backend.auth import require_role
+from backend.auth import require_role, get_current_user
 from backend.database import get_db
 from backend import models
 
@@ -29,6 +29,13 @@ class RoomUpdate(BaseModel):
 def out(s):
     return {"id": s.id, "conference_id": s.conference_id, "title": s.title, "speaker_id": s.speaker_id, "speaker_confirmed": s.speaker_confirmed, "start_time": s.start_time, "end_time": s.end_time, "location": s.location, "room_capacity": s.room_capacity, "expected_attendees": s.expected_attendees}
 
+@router.get("/")
+def list_sessions(conference_id: Optional[int] = None, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    query = db.query(models.Session)
+    if conference_id is not None:
+        query = query.filter(models.Session.conference_id == conference_id)
+    return [out(session) for session in query.order_by(models.Session.start_time.asc()).all()]
+
 @router.post("/", status_code=201)
 def create_session(payload: SessionCreate, db: Session = Depends(get_db), current_user=Depends(require_role("organizer"))):
     if not db.query(models.Conference).filter(models.Conference.id == payload.conference_id).first(): raise HTTPException(404, "Conference not found")
@@ -51,6 +58,8 @@ def assign_speaker(session_id: int, payload: SpeakerAssign, db: Session = Depend
 def confirm_speaker(session_id: int, payload: SpeakerConfirmation, db: Session = Depends(get_db), current_user=Depends(require_role("organizer"))):
     s = db.query(models.Session).filter(models.Session.id == session_id).first()
     if not s: raise HTTPException(404, "Session not found")
+    if payload.confirmed and not s.speaker_id:
+        raise HTTPException(400, "Assign a speaker before marking the speaker as confirmed.")
     s.speaker_confirmed = payload.confirmed; db.commit(); db.refresh(s); return out(s)
 
 @rooms_router.get("/utilization")

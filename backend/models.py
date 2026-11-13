@@ -212,3 +212,11 @@ class Certificate(Base):
     issued_at = Column(DateTime, default=datetime.utcnow)
 
 
+
+
+class ResourceForecastSetting(Base):
+    __tablename__ = "resource_forecast_settings"
+    id = Column(Integer, primary_key=True, index=True)
+    conference_id = Column(Integer, ForeignKey("conferences.id"), nullable=False, unique=True, index=True)
+    attendance_rate_percent = Column(Float, nullable=False, default=84.0)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)

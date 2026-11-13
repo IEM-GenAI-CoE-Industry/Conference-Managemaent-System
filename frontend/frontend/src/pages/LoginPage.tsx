@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import api from "../api";
 import { roleHome, roleOptions, type AppRole } from "../access";
 
+const showDemoAccounts = import.meta.env.DEV;
+
 const demoAccounts: Record<AppRole, string> = {
   organizer: "organizer@demo.com",
   participant: "participant@demo.com",
@@ -92,8 +94,8 @@ export default function LoginPage() {
                 ))}
               </div>
             </fieldset>
-            <div style={styles.demoAccounts}>
-              <span style={styles.demoHint}>Demo login · password: demo123</span>
+            {showDemoAccounts && <div style={styles.demoAccounts}>
+              <span style={styles.demoHint}>Development demo accounts only · password: demo123</span>
               <div style={styles.demoButtons}>
                 {roleOptions.map((role) => (
                   <button
@@ -111,7 +113,7 @@ export default function LoginPage() {
                   </button>
                 ))}
               </div>
-            </div>
+            </div>}
             <div style={styles.field}>
               <label style={styles.label}>Email</label>
               <input

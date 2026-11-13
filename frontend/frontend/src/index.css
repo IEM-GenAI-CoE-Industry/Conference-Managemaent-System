@@ -67,3 +67,12 @@ h6 {
 ::selection {
   background: rgba(124, 58, 237, 0.4);
 }
+
+
+/* Shared keyboard focus and readable form defaults (WCAG-oriented baseline). */
+:focus-visible { outline: 3px solid #67e8f9; outline-offset: 3px; }
+button:disabled, input:disabled, select:disabled { opacity: 0.65; cursor: not-allowed; }
+label, .label, .muted, small { color: #cbd5e1; }
+input, select, textarea { color-scheme: dark; }
+[role="alert"] { color: #fecaca; }
+[role="status"] { color: #bbf7d0; }

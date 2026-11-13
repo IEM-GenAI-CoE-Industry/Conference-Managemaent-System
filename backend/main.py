@@ -1,3 +1,5 @@
+import logging
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.database import Base, SessionLocal, engine, upgrade_sqlite_schema
@@ -7,6 +9,8 @@ from backend.routers import conferences_router, sessions_router, sponsors_router
 
 
 def ensure_demo_seed() -> None:
+    if os.getenv("CMS_ENABLE_DEMO_SEED", "false").lower() not in {"1", "true", "yes"}:
+        return
     try:
         with SessionLocal() as db:
             needed_demo_emails = {
@@ -38,6 +42,8 @@ Base.metadata.create_all(bind=engine)
 upgrade_sqlite_schema()
 ensure_demo_seed()
 
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(), format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logger = logging.getLogger("cms.api")
 app = FastAPI(title="Conference Management System", version="1.0.0", description="Working prototype for conference lifecycle management")
 app.add_middleware(
     CORSMiddleware,
@@ -50,8 +56,9 @@ app.add_middleware(
 @app.get("/")
 def home(): return {"message":"Conference Management System API is running"}
 
-@app.get("/health")
-def health(): return {"status":"healthy"}
+@app.get("/health", tags=["Health"])
+def health():
+    return {"status": "healthy", "service": "conference-management-system", "version": app.version}
 
 app.include_router(auth_router)
 app.include_router(user_directory_router)
