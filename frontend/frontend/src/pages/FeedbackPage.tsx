@@ -88,12 +88,26 @@ export default function FeedbackPage() {
           <div style={styles.field}>
             <label>Rating (1-5 stars)</label>
             <div style={{ display: 'flex', gap: 8 }}>
-              {[1,2,3,4,5].map(s => (
-                <button key={s} type="button" onClick={() => setRating(s)}
-                  style={{ ...styles.star, background: s <= rating ? '#f59e0b' : '#e5e7eb', color: s <= rating ? '#fff' : '#374151' }}>
-                  ★ {s}
-                </button>
-              ))}
+              
+                {[1, 2, 3, 4, 5].map(s => (
+                  <button
+                    key={s}
+                    type="button"
+                    aria-pressed={rating === s}
+                    aria-label={`Rate ${s} out of 5 stars`}
+                    onClick={() => setRating(s)}
+                    style={{
+                      ...styles.star,
+                      background: s <= rating ? '#f59e0b' : '#e5e7eb',
+                      color: s <= rating ? '#fff' : '#374151',
+                      border: rating === s ? '3px solid #92400e' : '3px solid transparent',
+                      outlineOffset: 2,
+                    }}
+                  >
+                    ★ {s}
+                  </button>
+                ))}
+
             </div>
           </div>
           <div style={styles.field}>
@@ -155,11 +169,16 @@ const styles = {
   title: { fontSize: 26, fontWeight: 700, color: '#f8fafc', marginBottom: 24 },
   card: { background: 'linear-gradient(145deg, rgba(15,23,42,0.96), rgba(30,41,59,0.88))', color: '#e2e8f0', border: '1px solid rgba(148,163,184,0.2)', borderRadius: 10, padding: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.18)', marginBottom: 24 },
   sectionTitle: { fontSize: 16, fontWeight: 600, color: '#374151', marginBottom: 16 },
-  field: { marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 6 },
+  field: {
+  marginBottom: 16,
+  display: 'flex',
+  flexDirection: 'column' as const,
+  gap: 6,
+},
   input: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 },
   button: { padding: '10px 24px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 },
   star: { padding: '6px 12px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600 },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: 14 },
+  table: { width: '100%', borderCollapse: 'collapse' as const, fontSize: 14 },
   error: { background: '#fee2e2', color: '#dc2626', padding: 10, borderRadius: 8, marginBottom: 12 },
   success: { background: '#d1fae5', color: '#065f46', padding: 10, borderRadius: 8, marginBottom: 12 },
 };

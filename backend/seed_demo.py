@@ -36,7 +36,7 @@ def seed():
 
         regs = [
             Registration(user_id=participant.id, conference_id=conference.id, category="student"),
-            Registration(user_id=author.id, conference_id=conference.id, category="researcher"),
+            Registration(user_id=author.id, conference_id=conference.id, category="author"),
             Registration(user_id=participant2.id, conference_id=conference.id, category="student"),
         ]
         db.add_all(regs); db.flush()

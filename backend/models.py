@@ -2,7 +2,16 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, Boolean, Float
+from sqlalchemy import (
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    Boolean,
+    Float,
+)
 from sqlalchemy.orm import relationship, synonym
 
 from backend.database import Base
@@ -22,7 +31,7 @@ class User(Base):
     role = Column(String(50), nullable=False, index=True)
     is_active = Column(Boolean, nullable=False, default=True)
 
-    # Compatibility with the existing auth code/assignment terminology.
+    # Compatibility with existing auth code and assignment terminology.
     name = synonym("username")
     hashed_password = synonym("password")
 
@@ -39,23 +48,37 @@ class Conference(Base):
     organizer_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     created_at = Column(DateTime, default=utcnow)
 
-    # Backward-compatible aliases used by some teammate code.
+    # Backward-compatible aliases.
     name = synonym("title")
     venue = synonym("location")
     created_by = synonym("organizer_id")
 
     organizer = relationship("User", foreign_keys=[organizer_id])
-    sponsors = relationship("Sponsor", back_populates="conference", cascade="all, delete-orphan")
-    exhibitors = relationship("Exhibitor", back_populates="conference", cascade="all, delete-orphan")
-    sessions = relationship("Session", back_populates="conference", cascade="all, delete-orphan")
-    registrations = relationship("Registration", back_populates="conference", cascade="all, delete-orphan")
+    sponsors = relationship(
+        "Sponsor", back_populates="conference",
+        cascade="all, delete-orphan"
+    )
+    exhibitors = relationship(
+        "Exhibitor", back_populates="conference",
+        cascade="all, delete-orphan"
+    )
+    sessions = relationship(
+        "Session", back_populates="conference",
+        cascade="all, delete-orphan"
+    )
+    registrations = relationship(
+        "Registration", back_populates="conference",
+        cascade="all, delete-orphan"
+    )
 
 
 class Session(Base):
     __tablename__ = "sessions"
 
     id = Column(Integer, primary_key=True, index=True)
-    conference_id = Column(Integer, ForeignKey("conferences.id"), nullable=False, index=True)
+    conference_id = Column(
+        Integer, ForeignKey("conferences.id"), nullable=False, index=True
+    )
     title = Column(String(200), nullable=False)
     speaker_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     start_time = Column(DateTime, nullable=False)
@@ -68,8 +91,14 @@ class Session(Base):
 
     conference = relationship("Conference", back_populates="sessions")
     speaker = relationship("User", foreign_keys=[speaker_id])
-    attendance_records = relationship("Attendance", back_populates="session", cascade="all, delete-orphan")
-    feedback_records = relationship("Feedback", back_populates="session", cascade="all, delete-orphan")
+    attendance_records = relationship(
+        "Attendance", back_populates="session",
+        cascade="all, delete-orphan"
+    )
+    feedback_records = relationship(
+        "Feedback", back_populates="session",
+        cascade="all, delete-orphan"
+    )
 
 
 class Sponsor(Base):
@@ -78,7 +107,9 @@ class Sponsor(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(250), nullable=False)
     tier = Column(String(50), nullable=False)
-    conference_id = Column(Integer, ForeignKey("conferences.id"), nullable=False, index=True)
+    conference_id = Column(
+        Integer, ForeignKey("conferences.id"), nullable=False, index=True
+    )
     contact_email = Column(String(255), nullable=True)
     logo_url = Column(String(500), nullable=True)
     website = Column(String(500), nullable=True)
@@ -91,7 +122,9 @@ class Exhibitor(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(250), nullable=False)
-    conference_id = Column(Integer, ForeignKey("conferences.id"), nullable=False, index=True)
+    conference_id = Column(
+        Integer, ForeignKey("conferences.id"), nullable=False, index=True
+    )
     booth_location = Column(String(100), nullable=True)
     description = Column(Text, nullable=True)
 
@@ -103,24 +136,38 @@ class Registration(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    conference_id = Column(Integer, ForeignKey("conferences.id"), nullable=False, index=True)
+    conference_id = Column(
+        Integer, ForeignKey("conferences.id"), nullable=False, index=True
+    )
     category = Column(String(50), nullable=False, default="participant")
     status = Column(String(30), nullable=False, default="registered")
     created_at = Column(DateTime, default=utcnow)
 
     user = relationship("User")
     conference = relationship("Conference", back_populates="registrations")
-    payment = relationship("Payment", back_populates="registration", uselist=False, cascade="all, delete-orphan")
+    payment = relationship(
+        "Payment", back_populates="registration",
+        uselist=False, cascade="all, delete-orphan"
+    )
 
 
 class Payment(Base):
     __tablename__ = "payments"
 
     id = Column(Integer, primary_key=True, index=True)
-    registration_id = Column(Integer, ForeignKey("registrations.id"), nullable=False, unique=True, index=True)
+    registration_id = Column(
+        Integer, ForeignKey("registrations.id"),
+        nullable=False, unique=True, index=True
+    )
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     amount = Column(Float, nullable=False)
+    currency = Column(String(3), nullable=False, default="INR")
+    provider = Column(String(40), nullable=False, default="college_demo_gateway")
+    gateway_order_id = Column(String(80), unique=True, nullable=True, index=True)
+    gateway_payment_id = Column(String(80), unique=True, nullable=True, index=True)
     status = Column(String(30), nullable=False, default="pending")
+    failure_reason = Column(String(250), nullable=True)
+    refunded_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utcnow)
     confirmed_at = Column(DateTime, nullable=True)
 
@@ -133,7 +180,9 @@ class Attendance(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    session_id = Column(Integer, ForeignKey("sessions.id"), nullable=False, index=True)
+    session_id = Column(
+        Integer, ForeignKey("sessions.id"), nullable=False, index=True
+    )
     attended = Column(Boolean, nullable=False, default=False)
     marked_at = Column(DateTime, default=utcnow)
 
@@ -145,29 +194,30 @@ class Feedback(Base):
     __tablename__ = "feedback"
 
     id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(Integer, ForeignKey("sessions.id"), nullable=False, index=True)
+    session_id = Column(
+        Integer, ForeignKey("sessions.id"), nullable=False, index=True
+    )
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    conference_id = Column(Integer, ForeignKey("conferences.id"), nullable=False, index=True)
+    conference_id = Column(
+        Integer, ForeignKey("conferences.id"), nullable=False, index=True
+    )
     rating = Column(Integer, nullable=False)
     comments = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utcnow)
 
     session = relationship("Session", back_populates="feedback_records")
     user = relationship("User")
-    
-    
-    
-    
 
 
-# ---------------------------------------------------------------------------
-# SUBMISSIONS, REVIEWS, ANNOUNCEMENTS & CERTIFICATES
-# ---------------------------------------------------------------------------
+# Submissions, reviews, announcements and certificates
+
 class Submission(Base):
     __tablename__ = "submissions"
 
     id = Column(Integer, primary_key=True, index=True)
-    conference_id = Column(Integer, ForeignKey("conferences.id"), nullable=False)
+    conference_id = Column(
+        Integer, ForeignKey("conferences.id"), nullable=False
+    )
     author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     title = Column(String(255), nullable=False)
     abstract = Column(Text, nullable=False)
@@ -177,25 +227,39 @@ class Submission(Base):
     camera_ready_file_url = Column(String(500), nullable=True)
     notes = Column(Text, nullable=True)
 
+
 class Review(Base):
     __tablename__ = "reviews"
 
     id = Column(Integer, primary_key=True, index=True)
-    submission_id = Column(Integer, ForeignKey("submissions.id"), nullable=False)
+    submission_id = Column(
+        Integer, ForeignKey("submissions.id"), nullable=False
+    )
     reviewer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     status = Column(String(50), default="assigned")
     score = Column(Integer, nullable=True)
     recommendation = Column(String(50), nullable=True)
     comments = Column(Text, nullable=True)
     assigned_at = Column(DateTime, default=datetime.utcnow)
+    deadline = Column(DateTime, nullable=True)
     submitted_at = Column(DateTime, nullable=True)
+
+    # M-26: structured review rubric
+    originality_score = Column(Integer, nullable=True)
+    methodology_score = Column(Integer, nullable=True)
+    clarity_score = Column(Integer, nullable=True)
+    significance_score = Column(Integer, nullable=True)
+    confidence_score = Column(Integer, nullable=True)
+    confidential_comments = Column(Text, nullable=True)
 
 
 class Announcement(Base):
     __tablename__ = "announcements"
 
     id = Column(Integer, primary_key=True, index=True)
-    conference_id = Column(Integer, ForeignKey("conferences.id"), nullable=False)
+    conference_id = Column(
+        Integer, ForeignKey("conferences.id"), nullable=False
+    )
     title = Column(String(255), nullable=False)
     message = Column(Text, nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -206,17 +270,64 @@ class Certificate(Base):
     __tablename__ = "certificates"
 
     id = Column(Integer, primary_key=True, index=True)
-    certificate_uuid = Column(String(36), unique=True, index=True, default=lambda: str(uuid.uuid4()))
+    certificate_uuid = Column(
+        String(36), unique=True, index=True,
+        default=lambda: str(uuid.uuid4())
+    )
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    conference_id = Column(Integer, ForeignKey("conferences.id"), nullable=False)
+    conference_id = Column(
+        Integer, ForeignKey("conferences.id"), nullable=False
+    )
     issued_at = Column(DateTime, default=datetime.utcnow)
 
 
-
+# Member E: resource forecast configuration
 
 class ResourceForecastSetting(Base):
     __tablename__ = "resource_forecast_settings"
+
     id = Column(Integer, primary_key=True, index=True)
-    conference_id = Column(Integer, ForeignKey("conferences.id"), nullable=False, unique=True, index=True)
+    conference_id = Column(
+        Integer, ForeignKey("conferences.id"),
+        nullable=False, unique=True, index=True
+    )
     attendance_rate_percent = Column(Float, nullable=False, default=84.0)
-    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+# Main branch: conflict of interest records
+
+class ConflictOfInterest(Base):
+    __tablename__ = "conflicts_of_interest"
+
+    id = Column(Integer, primary_key=True, index=True)
+    submission_id = Column(
+        Integer, ForeignKey("submissions.id"), nullable=False
+    )
+    reviewer_id = Column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+    reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# Main branch: user notifications
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
+    )
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+    notification_type = Column(
+        String(50), nullable=False, default="general"
+    )
+    is_read = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")

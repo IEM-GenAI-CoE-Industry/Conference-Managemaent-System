@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from backend.auth import require_role
 from backend.database import get_db
-from backend.models import Review, Submission, User
+from backend.models import ConflictOfInterest, Notification, Review, Submission, User
 
 router = APIRouter(prefix="/reviewers", tags=["Reviewer Workload"])
 submission_router = APIRouter(prefix="/submissions", tags=["Reviewer Workload"])
@@ -51,6 +51,7 @@ def _reviewer_loads(db: Session, conference_id: int):
                 "reviewer_name": row.reviewer_name,
                 "assigned_count": int(assignments),
                 "status": status,
+                "expertise": "Not specified",
             }
         )
     return result
@@ -81,13 +82,20 @@ def suggest_reviewer(
         raise HTTPException(404, "No reviewers found")
 
     recommended = min(reviewers, key=lambda item: item["assigned_count"])
+    
     return {
-        "conference_id": conference_id,
-        "recommended_reviewer_id": recommended["reviewer_id"],
-        "reviewer_name": recommended["reviewer_name"],
-        "current_load": recommended["assigned_count"],
-        "status": recommended["status"],
-    }
+    "conference_id": conference_id,
+    "recommended_reviewer_id": recommended["reviewer_id"],
+    "reviewer_name": recommended["reviewer_name"],
+    "current_load": recommended["assigned_count"],
+    "status": recommended["status"],
+    "expertise": recommended["expertise"],
+    "reason": (
+        f"Recommended because this reviewer has the lowest current workload "
+        f"({recommended['assigned_count']} assigned paper(s))."
+    ),
+}
+
 
 
 @submission_router.patch("/{submission_id}/reassign")
@@ -97,30 +105,83 @@ def reassign_submission(
     db: Session = Depends(get_db),
     current_user=Depends(require_role("organizer")),
 ):
-    submission = db.query(Submission).filter(Submission.id == submission_id).first()
-    if not submission:
-        raise HTTPException(404, "Submission not found")
-
-    reviewer = (
-        db.query(User)
-        .filter(User.id == reviewer_id, User.role == "reviewer")
+    # Validate submission
+    submission = (
+        db.query(Submission)
+        .filter(Submission.id == submission_id)
         .first()
     )
-    if not reviewer:
-        raise HTTPException(404, "Reviewer not found")
+    if submission is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Submission {submission_id} not found",
+        )
 
+    # Validate that the user exists
+    reviewer = (
+        db.query(User)
+        .filter(User.id == reviewer_id)
+        .first()
+    )
+    if reviewer is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"User {reviewer_id} not found",
+        )
+
+    # Validate that the user is a reviewer
+    if reviewer.role != "reviewer":
+        raise HTTPException(
+            status_code=400,
+            detail=f"User {reviewer_id} is not a reviewer",
+        )
+
+    
+    conflict = (
+        db.query(ConflictOfInterest)
+        .filter(
+            ConflictOfInterest.submission_id == submission_id,
+            ConflictOfInterest.reviewer_id == reviewer_id,
+        )
+        .first()
+    )
+    if conflict:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot reassign: reviewer has a conflict of interest.",
+        )
+
+
+    # Find an existing assignment
     review = (
         db.query(Review)
         .filter(Review.submission_id == submission_id)
         .order_by(Review.id)
         .first()
     )
-    if not review:
-        raise HTTPException(404, "No reviewer assignment exists for this submission")
+    if review is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No review assignment exists for submission {submission_id}",
+        )
 
+    # Reassign and save
+    
+    # Reassign and notify the new reviewer
     review.reviewer_id = reviewer_id
+
+    db.add(
+        Notification(
+            user_id=reviewer.id,
+            title="Paper Reassigned to You",
+            message=f"You have been assigned to review '{submission.title}'.",
+            notification_type="review_assignment",
+        )
+    )
+
     db.commit()
     db.refresh(review)
+
 
     return {
         "message": "Submission reassigned successfully",

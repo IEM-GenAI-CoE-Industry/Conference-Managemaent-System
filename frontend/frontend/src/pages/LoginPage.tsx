@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
 import { roleHome, roleOptions, type AppRole } from "../access";
@@ -15,55 +16,111 @@ const demoAccounts: Record<AppRole, string> = {
 
 export default function LoginPage() {
   const navigate = useNavigate();
+
   const [selectedRole, setSelectedRole] = useState<AppRole | "">("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [conferenceCount, setConferenceCount] = useState<number | null>(null);
+
+  // Preserve existing authentication and redirect behavior.
+  useEffect(() => {
+    const existingToken = localStorage.getItem("token");
+    const existingRole = localStorage.getItem("role");
+
+    if (
+      existingToken &&
+      existingRole &&
+      roleHome(existingRole) !== "/login"
+    ) {
+      navigate(roleHome(existingRole), { replace: true });
+    } else {
+      localStorage.removeItem("token");
+      localStorage.removeItem("role");
+      localStorage.removeItem("user_id");
+    }
+  }, [navigate]);
+
+  // Fetch public conference data without requiring login.
+  useEffect(() => {
+    async function fetchConferenceCount() {
+      try {
+        const res = await api.get("/conferences/");
+
+        if (Array.isArray(res.data)) {
+          setConferenceCount(res.data.length);
+        }
+      } catch (err) {
+        console.error("Failed to fetch conferences:", err);
+      }
+    }
+
+    fetchConferenceCount();
+  }, []);
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+
     if (!selectedRole) {
       setError("Choose your account role to continue.");
       return;
     }
+
     setLoading(true);
     setError("");
+
     try {
       const res = await api.post("/auth/login", {
         email: email.trim().toLowerCase(),
         password,
         role: selectedRole,
       });
+
       localStorage.setItem("token", res.data.access_token);
       localStorage.setItem("role", res.data.role);
-      localStorage.setItem("user_id", res.data.user_id);
+      localStorage.setItem("user_id", String(res.data.user_id));
+
       navigate(roleHome(res.data.role), { replace: true });
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Login failed");
+      localStorage.removeItem("token");
+      localStorage.removeItem("role");
+      localStorage.removeItem("user_id");
+
+      setError(
+        err.response?.data?.detail || "Invalid email or password"
+      );
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div style={styles.container}>
+    <main style={styles.container}>
       <div style={styles.panel}>
         <div style={styles.heroPanel}>
           <span style={styles.kicker}>Conference Platform</span>
-          <h1 style={styles.heroTitle}>Run your event with confidence.</h1>
+
+          <h1 style={styles.heroTitle}>
+            Run your event with confidence.
+          </h1>
+
           <p style={styles.heroText}>
-            Track speakers, registrations, sessions, and attendee experiences from one sleek command center.
+            Track speakers, registrations, sessions, and attendee experiences
+            from one sleek command center.
           </p>
 
           <div style={styles.metricsRow}>
             <div style={styles.metricBox}>
-              <strong style={styles.metricValue}>2.4k</strong>
-              <span style={styles.metricLabel}>Attendees</span>
+              <strong style={styles.metricValue}>
+                {conferenceCount === null ? "—" : conferenceCount}
+              </strong>
+              <span style={styles.metricLabel}>Conferences</span>
             </div>
+
             <div style={styles.metricBox}>
-              <strong style={styles.metricValue}>48</strong>
-              <span style={styles.metricLabel}>Sessions</span>
+              <strong style={styles.metricValue}>Live</strong>
+              <span style={styles.metricLabel}>Event management</span>
             </div>
           </div>
         </div>
@@ -74,12 +131,21 @@ export default function LoginPage() {
             <h2 style={styles.title}>Sign in</h2>
           </div>
 
-          {error && <div style={styles.error}>{error}</div>}
+          {error && (
+            <div role="alert" style={styles.error}>
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleLogin}>
             <fieldset style={styles.roleFieldset}>
               <legend style={styles.label}>Sign in as</legend>
-              <div role="radiogroup" aria-label="Account role" style={styles.roleGrid}>
+
+              <div
+                role="radiogroup"
+                aria-label="Account role"
+                style={styles.roleGrid}
+              >
                 {roleOptions.map((role) => (
                   <button
                     key={role.value}
@@ -87,36 +153,52 @@ export default function LoginPage() {
                     role="radio"
                     aria-checked={selectedRole === role.value}
                     onClick={() => setSelectedRole(role.value)}
-                    style={{ ...styles.roleButton, ...(selectedRole === role.value ? styles.selectedRoleButton : {}) }}
+                    style={{
+                      ...styles.roleButton,
+                      ...(selectedRole === role.value
+                        ? styles.selectedRoleButton
+                        : {}),
+                    }}
                   >
                     {role.label}
                   </button>
                 ))}
               </div>
             </fieldset>
-            {showDemoAccounts && <div style={styles.demoAccounts}>
-              <span style={styles.demoHint}>Development demo accounts only · password: demo123</span>
-              <div style={styles.demoButtons}>
-                {roleOptions.map((role) => (
-                  <button
-                    key={role.value}
-                    type="button"
-                    style={styles.demoButton}
-                    onClick={() => {
-                      setSelectedRole(role.value);
-                      setEmail(demoAccounts[role.value]);
-                      setPassword("demo123");
-                      setError("");
-                    }}
-                  >
-                    Use {role.label}
-                  </button>
-                ))}
+
+            {showDemoAccounts && (
+              <div style={styles.demoAccounts}>
+                <span style={styles.demoHint}>
+                  Development demo accounts only · password: demo123
+                </span>
+
+                <div style={styles.demoButtons}>
+                  {roleOptions.map((role) => (
+                    <button
+                      key={role.value}
+                      type="button"
+                      style={styles.demoButton}
+                      onClick={() => {
+                        setSelectedRole(role.value);
+                        setEmail(demoAccounts[role.value]);
+                        setPassword("demo123");
+                        setError("");
+                      }}
+                    >
+                      Use {role.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>}
+            )}
+
             <div style={styles.field}>
-              <label style={styles.label}>Email</label>
+              <label style={styles.label} htmlFor="login-email">
+                Email
+              </label>
+
               <input
+                id="login-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -127,8 +209,12 @@ export default function LoginPage() {
             </div>
 
             <div style={styles.field}>
-              <label style={styles.label}>Password</label>
+              <label style={styles.label} htmlFor="login-password">
+                Password
+              </label>
+
               <input
+                id="login-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -138,28 +224,39 @@ export default function LoginPage() {
               />
             </div>
 
-            <button type="submit" style={styles.button} disabled={loading}>
+            <button
+              type="submit"
+              style={{
+                ...styles.button,
+                ...(loading ? styles.disabledButton : {}),
+              }}
+              disabled={loading}
+            >
               {loading ? "Logging in..." : "Login"}
             </button>
           </form>
 
           <p style={styles.footerText}>
-            Don’t have an account? <a href="/register" style={styles.link}>Create one</a>
+            Don’t have an account?{" "}
+            <a href="/register" style={styles.link}>
+              Create one
+            </a>
           </p>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 
-const styles = {
+const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: "100vh",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     padding: "28px",
-    background: "radial-gradient(circle at top left, rgba(96,165,250,0.24), transparent 30%), radial-gradient(circle at bottom right, rgba(168,85,247,0.18), transparent 25%), linear-gradient(135deg, #020817 0%, #0f172a 50%, #111827 100%)",
+    background:
+      "radial-gradient(circle at top left, rgba(96,165,250,0.24), transparent 30%), radial-gradient(circle at bottom right, rgba(168,85,247,0.18), transparent 25%), linear-gradient(135deg, #020817 0%, #0f172a 50%, #111827 100%)",
   },
   panel: {
     width: "100%",
@@ -175,7 +272,8 @@ const styles = {
     backdropFilter: "blur(14px)",
   },
   heroPanel: {
-    background: "linear-gradient(135deg, rgba(59,130,246,0.25), rgba(168,85,247,0.18), rgba(15,23,42,0.24))",
+    background:
+      "linear-gradient(135deg, rgba(59,130,246,0.25), rgba(168,85,247,0.18), rgba(15,23,42,0.24))",
     padding: "52px 42px",
     display: "flex",
     flexDirection: "column",
@@ -324,6 +422,7 @@ const styles = {
   },
   input: {
     width: "100%",
+    boxSizing: "border-box",
     padding: "13px 14px",
     border: "1px solid rgba(148, 163, 184, 0.24)",
     borderRadius: 12,
@@ -345,6 +444,11 @@ const styles = {
     fontWeight: 800,
     cursor: "pointer",
     boxShadow: "0 18px 36px rgba(96, 165, 250, 0.28)",
+  },
+  disabledButton: {
+    opacity: 0.65,
+    cursor: "not-allowed",
+    filter: "grayscale(25%)",
   },
   error: {
     background: "rgba(127, 29, 29, 0.2)",

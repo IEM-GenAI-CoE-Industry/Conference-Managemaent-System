@@ -39,6 +39,25 @@ def upgrade_sqlite_schema() -> None:
             "camera_ready_file_url": "VARCHAR(500)",
             "notes": "TEXT",
         },
+
+        "reviews": {
+            "deadline": "DATETIME",
+            "originality_score": "INTEGER",
+            "methodology_score": "INTEGER",
+            "clarity_score": "INTEGER",
+            "significance_score": "INTEGER",
+            "confidence_score": "INTEGER",
+            "confidential_comments": "TEXT",
+        },
+        "payments": {
+            "currency": "VARCHAR(3) NOT NULL DEFAULT 'INR'",
+            "provider": "VARCHAR(40) NOT NULL DEFAULT 'college_demo_gateway'",
+            "gateway_order_id": "VARCHAR(80)",
+            "gateway_payment_id": "VARCHAR(80)",
+            "failure_reason": "VARCHAR(250)",
+            "refunded_at": "DATETIME",
+        },
+
     }
 
     with engine.begin() as connection:

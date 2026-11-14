@@ -1,135 +1,480 @@
-import { useEffect, useState } from 'react';
-import api from '../api';
 
-const getSelectedConferenceId = () => Number(localStorage.getItem("selected_conference_id") || 0);
+import { useEffect, useMemo, useState } from "react";
+import api from "../api";
+
+type Certificate = {
+  id: number;
+  certificate_uuid: string;
+  conference_id: number;
+  issued_at: string;
+};
+
+type Eligible = {
+  conference_id: number;
+  conference_name: string;
+  user_id: number;
+  attendee_name: string;
+  eligible: boolean;
+};
+
+type Conference = {
+  id: number;
+  name: string;
+};
+
+type VerifyResult = {
+  user_id: number;
+  conference_id: number;
+  issued_at: string;
+  attendee_name?: string;
+  conference_name?: string;
+};
 
 export default function CertificatesPage() {
-  const [certificates, setCertificates] = useState([]);
-  const [verifyUUID, setVerifyUUID] = useState('');
-  const [verifyResult, setVerifyResult] = useState(null);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const organizer = localStorage.getItem("role") === "organizer";
 
-  useEffect(() => { loadCertificates(); }, []);
+  const [certs, setCerts] = useState<Certificate[]>([]);
+  const [eligible, setEligible] = useState<Eligible[]>([]);
+  const [conferences, setConferences] = useState<Conference[]>([]);
 
-  async function loadCertificates() {
+  const [choice, setChoice] = useState("");
+  const [attendeeSearch, setAttendeeSearch] = useState("");
+
+  const [verifyUUID, setVerifyUUID] = useState("");
+  const [verifyResult, setVerifyResult] =
+    useState<VerifyResult | null>(null);
+
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const attendeeOptions = useMemo(
+    () =>
+      eligible.map((item) => ({
+        value: `${item.attendee_name} — ${item.conference_name}`,
+        key: `${item.conference_id}:${item.user_id}`,
+      })),
+    [eligible]
+  );
+
+  function getConferenceName(id: number) {
+    return (
+      conferences.find((conference) => conference.id === id)?.name ||
+      `Conference ${id}`
+    );
+  }
+
+  async function load() {
     try {
-      const res = await api.get('/certificates/me');
-      setCertificates(res.data);
-    } catch (err) {
-      setError('Failed to load certificates');
+      const [certificateResponse, conferenceResponse] =
+        await Promise.all([
+          api.get("/certificates/me"),
+          api.get("/conferences/"),
+        ]);
+
+      setCerts(
+        Array.isArray(certificateResponse.data)
+          ? certificateResponse.data
+          : []
+      );
+
+      setConferences(
+        Array.isArray(conferenceResponse.data)
+          ? conferenceResponse.data
+          : []
+      );
+
+      if (organizer) {
+        const eligibleResponse = await api.get("/certificates/options");
+
+        const options: Eligible[] = Array.isArray(eligibleResponse.data)
+          ? eligibleResponse.data
+          : [];
+
+        setEligible(options);
+
+        setChoice((current) => {
+          if (
+            current &&
+            options.some(
+              (item) =>
+                `${item.conference_id}:${item.user_id}` === current
+            )
+          ) {
+            return current;
+          }
+
+          return options.length
+            ? `${options[0].conference_id}:${options[0].user_id}`
+            : "";
+        });
+      }
+    } catch (error: any) {
+      setMessage(
+        error?.response?.data?.detail ||
+          "Could not load certificates."
+      );
     }
   }
 
-  async function handleGenerate() {
-    setError(''); setSuccess('');
+  useEffect(() => {
+    void load();
+  }, []);
+
+  function handleAttendeeSearch(value: string) {
+    setAttendeeSearch(value);
+
+    const selected = eligible.find(
+      (item) =>
+        `${item.attendee_name} — ${item.conference_name}` === value
+    );
+
+    setChoice(
+      selected
+        ? `${selected.conference_id}:${selected.user_id}`
+        : ""
+    );
+  }
+
+  async function issue() {
+    if (!choice) {
+      setMessage("Please select an eligible attendee from the suggestions.");
+      return;
+    }
+
+    const [conference_id, user_id] = choice.split(":").map(Number);
+
+    setLoading(true);
+    setMessage("");
+
     try {
-      const conferenceId = getSelectedConferenceId();
-      if (!conferenceId) { setError('Choose a conference on the Conferences page first.'); return; }
-      await api.post('/certificates/generate', { conference_id: conferenceId });
-      setSuccess('Certificate generated!');
-      loadCertificates();
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to generate certificate');
+      await api.post("/certificates/generate", {
+        conference_id,
+        user_id,
+      });
+
+      setMessage("Certificate issued successfully.");
+      setAttendeeSearch("");
+      setChoice("");
+
+      await load();
+    } catch (error: any) {
+      setMessage(
+        error?.response?.data?.detail ||
+          "Certificate could not be issued."
+      );
+    } finally {
+      setLoading(false);
     }
   }
 
-  async function handleVerify(e) {
-    e.preventDefault();
-    setVerifyResult(null); setError('');
+  async function download(certificate: Certificate) {
     try {
-      const res = await api.get(`/certificates/verify/${verifyUUID}`);
-      setVerifyResult(res.data);
-    } catch (err) {
-      setError('Certificate not found or invalid UUID');
+      const response = await api.get(
+        `/certificates/pdf/${certificate.certificate_uuid}`,
+        { responseType: "blob" }
+      );
+
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = `certificate-${certificate.certificate_uuid}.pdf`;
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      setMessage(
+        error?.response?.data?.detail ||
+          "Certificate download failed."
+      );
+    }
+  }
+
+  async function handleVerify(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+    setVerifyResult(null);
+    setMessage("");
+
+    try {
+      const response = await api.get(
+        `/certificates/verify/${verifyUUID.trim()}`
+      );
+
+      setVerifyResult(response.data);
+    } catch (error: any) {
+      setMessage(
+        error?.response?.data?.detail ||
+          "Certificate not found or invalid UUID."
+      );
     }
   }
 
   return (
-    <div style={styles.page}>
-      <h1 style={styles.title}>Certificates</h1>
+    <main style={s.page}>
+      <p style={s.eyebrow}>
+        {organizer ? "Organizer awards" : "My achievements"}
+      </p>
 
-      <div style={styles.card}>
-        <h2 style={styles.sectionTitle}>Generate Certificate</h2>
-        {error && <div style={styles.error}>{error}</div>}
-        {success && <div style={styles.success}>{success}</div>}
-        <p style={{ color: '#cbd5e1', marginBottom: 16, fontSize: 14 }}>
-          Generate a certificate for the conference selected on the Conferences page. Eligibility is checked by the server against conference attendance and certificate rules.
+      <h1 style={s.title}>Certificates</h1>
+
+      <p style={s.muted}>
+        {organizer
+          ? "Issue certificates only to attendees who meet the eligibility rules."
+          : "Your certificates will appear here after they are issued."}
+      </p>
+
+      {message && (
+        <p role="status" style={s.notice}>
+          {message}
         </p>
-        <button onClick={handleGenerate} style={styles.button}>🎓 Generate Certificate</button>
-      </div>
+      )}
 
-      <div style={styles.card}>
-        <h2 style={styles.sectionTitle}>My Certificates</h2>
-        {certificates.length === 0 ? (
-          <p style={{ color: '#6b7280' }}>No certificates yet. Generate one above!</p>
+      {organizer && (
+        <section style={s.card}>
+          <h2 style={s.sectionTitle}>
+            Issue an eligible certificate
+          </h2>
+
+          {eligible.length === 0 ? (
+            <p style={s.muted}>
+              No attendees currently meet the certificate eligibility rules.
+            </p>
+          ) : (
+            <>
+              <label style={s.label}>
+                Search eligible attendee
+
+                <input
+                  type="text"
+                  list="eligible-attendee-options"
+                  value={attendeeSearch}
+                  onChange={(event) =>
+                    handleAttendeeSearch(event.target.value)
+                  }
+                  placeholder="Type attendee or conference name..."
+                  autoComplete="off"
+                  style={s.input}
+                />
+
+                <datalist id="eligible-attendee-options">
+                  {attendeeOptions.map((option) => (
+                    <option
+                      key={option.key}
+                      value={option.value}
+                    />
+                  ))}
+                </datalist>
+              </label>
+
+              <button
+                type="button"
+                onClick={issue}
+                disabled={loading || !choice}
+                style={s.button}
+              >
+                {loading ? "Issuing..." : "Issue certificate"}
+              </button>
+            </>
+          )}
+        </section>
+      )}
+
+      <section style={s.card}>
+        <h2 style={s.sectionTitle}>
+          {organizer
+            ? "Certificates issued to me"
+            : "My certificates"}
+        </h2>
+
+        {certs.length === 0 ? (
+          <p style={s.muted}>No certificates issued yet.</p>
         ) : (
-          <table style={styles.table}>
-            <thead>
-              <tr style={{ background: '#f3f4f6' }}>
-                <th style={styles.th}>ID</th>
-                <th style={styles.th}>Conference ID</th>
-                <th style={styles.th}>UUID</th>
-                <th style={styles.th}>Issued At</th>
-              </tr>
-            </thead>
-            <tbody>
-              {certificates.map(c => (
-                <tr key={c.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                  <td style={styles.td}>{c.id}</td>
-                  <td style={styles.td}>{c.conference_id}</td>
-                  <td style={styles.td}>
-                    <code style={{ fontSize: 11, background: '#f3f4f6', padding: '2px 6px', borderRadius: 4 }}>
-                      {c.certificate_uuid}
-                    </code>
-                  </td>
-                  <td style={styles.td}>{new Date(c.issued_at).toLocaleDateString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+          certs.map((certificate) => (
+            <article key={certificate.id} style={s.row}>
+              <div>
+                <strong>Conference certificate</strong>
 
-      <div style={styles.card}>
-        <h2 style={styles.sectionTitle}>Verify Certificate (Public)</h2>
-        <p style={{ color: '#6b7280', fontSize: 14, marginBottom: 16 }}>No login required - anyone can verify a certificate using its UUID.</p>
-        <form onSubmit={handleVerify} style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: 14, display: 'block', marginBottom: 6 }}>Certificate UUID</label>
+                <p style={s.muted}>
+                  {getConferenceName(certificate.conference_id)}
+                </p>
+
+                <p style={s.muted}>
+                  Issued:{" "}
+                  {new Date(
+                    certificate.issued_at
+                  ).toLocaleDateString()}
+                </p>
+
+                <code style={s.uuid}>
+                  {certificate.certificate_uuid}
+                </code>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => download(certificate)}
+                style={s.button}
+              >
+                Download PDF
+              </button>
+            </article>
+          ))
+        )}
+      </section>
+
+      <section style={s.card}>
+        <h2 style={s.sectionTitle}>
+          Verify Certificate (Public)
+        </h2>
+
+        <p style={s.muted}>
+          No login required. Anyone can verify a certificate using its UUID.
+        </p>
+
+        <form onSubmit={handleVerify} style={s.form}>
+          <label style={s.label}>
+            Certificate UUID
+
             <input
               value={verifyUUID}
-              onChange={e => setVerifyUUID(e.target.value)}
+              onChange={(event) =>
+                setVerifyUUID(event.target.value)
+              }
               required
-              style={{ ...styles.input, width: '100%' }}
-              placeholder="Paste UUID here..."
+              style={s.input}
+              placeholder="Paste certificate UUID here..."
             />
-          </div>
-          <button type="submit" style={styles.button}>Verify</button>
+          </label>
+
+          <button type="submit" style={s.button}>
+            Verify
+          </button>
         </form>
+
         {verifyResult && (
-          <div style={{ marginTop: 16, background: '#d1fae5', border: '1px solid #6ee7b7', borderRadius: 8, padding: 16 }}>
-            <p style={{ color: '#065f46', fontWeight: 600, marginBottom: 8 }}>✓ Valid Certificate</p>
-            <p style={{ fontSize: 14, color: '#065f46' }}>User ID: {verifyResult.user_id}</p>
-            <p style={{ fontSize: 14, color: '#065f46' }}>Conference ID: {verifyResult.conference_id}</p>
-            <p style={{ fontSize: 14, color: '#065f46' }}>Issued: {new Date(verifyResult.issued_at).toLocaleDateString()}</p>
+          <div style={s.valid}>
+            <strong>✓ Valid Certificate</strong>
+
+            <p>
+              Attendee:{" "}
+              {verifyResult.attendee_name ||
+                `User reference ${verifyResult.user_id}`}
+            </p>
+
+            <p>
+              Conference:{" "}
+              {verifyResult.conference_name ||
+                getConferenceName(verifyResult.conference_id)}
+            </p>
+
+            <p>
+              Issued:{" "}
+              {new Date(
+                verifyResult.issued_at
+              ).toLocaleDateString()}
+            </p>
           </div>
         )}
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
 
-const styles = {
-  page: { padding: 32, background: '#f9fafb', minHeight: '100vh' },
-  title: { fontSize: 26, fontWeight: 700, color: '#111827', marginBottom: 24 },
-  card: { background: '#fff', borderRadius: 10, padding: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', marginBottom: 24 },
-  sectionTitle: { fontSize: 16, fontWeight: 600, color: '#374151', marginBottom: 16 },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: 14 },
-  th: { padding: '10px 14px', textAlign: 'left', fontSize: 13, fontWeight: 600 },
-  td: { padding: '12px 14px' },
-  input: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 },
-  button: { padding: '10px 20px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 },
-  error: { background: '#fee2e2', color: '#dc2626', padding: 10, borderRadius: 8, marginBottom: 12 },
-  success: { background: '#d1fae5', color: '#065f46', padding: 10, borderRadius: 8, marginBottom: 12 },
+const s: Record<string, React.CSSProperties> = {
+  page: {
+    maxWidth: 900,
+    margin: "0 auto",
+    padding: "12px 0 40px",
+  },
+  eyebrow: {
+    color: "#67e8f9",
+    fontSize: 12,
+    fontWeight: 800,
+    textTransform: "uppercase",
+    letterSpacing: ".12em",
+  },
+  title: {
+    color: "#f8fafc",
+    fontSize: 34,
+  },
+  muted: {
+    color: "#cbd5e1",
+    fontSize: 14,
+  },
+  notice: {
+    padding: 12,
+    background: "#164e63",
+    color: "#cffafe",
+    borderRadius: 8,
+  },
+  card: {
+    display: "grid",
+    gap: 16,
+    marginTop: 20,
+    padding: 24,
+    border: "1px solid #334155",
+    borderRadius: 14,
+    background: "#0f172a",
+    color: "#f8fafc",
+  },
+  sectionTitle: {
+    color: "#f8fafc",
+    margin: 0,
+  },
+  label: {
+    display: "grid",
+    gap: 8,
+    fontWeight: 700,
+    color: "#e2e8f0",
+  },
+  input: {
+    width: "100%",
+    padding: 13,
+    border: "1px solid #64748b",
+    borderRadius: 8,
+    background: "#111827",
+    color: "white",
+  },
+  form: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "flex-end",
+    gap: 12,
+  },
+  button: {
+    width: "fit-content",
+    padding: "11px 16px",
+    border: 0,
+    borderRadius: 8,
+    background: "#2563eb",
+    color: "white",
+    fontWeight: 800,
+    cursor: "pointer",
+  },
+  row: {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 16,
+    alignItems: "center",
+    padding: "14px 0",
+    borderTop: "1px solid #334155",
+  },
+  uuid: {
+    display: "inline-block",
+    color: "#bae6fd",
+    overflowWrap: "anywhere",
+  },
+  valid: {
+    padding: 16,
+    border: "1px solid #059669",
+    borderRadius: 8,
+    background: "#064e3b",
+    color: "#d1fae5",
+  },
 };

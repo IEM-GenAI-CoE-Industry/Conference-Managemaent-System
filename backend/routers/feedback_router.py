@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
-from backend.models import Feedback, Session as SessionModel, User
+from backend.models import Attendance, Feedback, Session as SessionModel, User
 
 router = APIRouter()
 class FeedbackCreate(BaseModel):
@@ -17,12 +17,42 @@ class FeedbackCreate(BaseModel):
 def submit_feedback(data: FeedbackCreate, db: Session=Depends(get_db), current_user: User=Depends(get_current_user)):
     session=db.query(SessionModel).filter(SessionModel.id==data.session_id).first()
     if not session: raise HTTPException(404,"Session not found")
+    attendance = db.query(Attendance).filter(
+        Attendance.session_id == data.session_id,
+        Attendance.user_id == current_user.id,
+        Attendance.attended.is_(True),
+    ).first()
+
+    if not attendance:
+        raise HTTPException(
+            status_code=403,
+            detail="Feedback is only allowed for sessions you attended",
+        )
     f=Feedback(session_id=data.session_id,user_id=current_user.id,conference_id=session.conference_id,rating=data.rating,comments=data.comments)
     db.add(f); db.commit(); db.refresh(f); return f
 
 @router.get("/")
-def list_feedback(conference_id:int,db:Session=Depends(get_db)):
-    return db.query(Feedback).filter(Feedback.conference_id==conference_id).all()
+def list_feedback(
+    conference_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    feedback_items = (
+        db.query(Feedback)
+        .filter(Feedback.conference_id == conference_id)
+        .all()
+    )
+
+    return [
+        {
+            "id": item.id,
+            "session_id": item.session_id,
+            "rating": item.rating,
+            "comments": item.comments,
+            "created_at": item.created_at,
+        }
+        for item in feedback_items
+    ]
 
 @router.get("/summary")
 def feedback_summary(conference_id:int,db:Session=Depends(get_db),current_user=Depends(require_role("organizer"))):
