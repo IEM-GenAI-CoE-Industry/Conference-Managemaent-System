@@ -170,8 +170,8 @@ export default function ExhibitorsPage() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: { padding: "2rem", maxWidth: 900, margin: "0 auto", fontFamily: "sans-serif" },
-  heading: { fontSize: "1.6rem", fontWeight: 700, marginBottom: "1.5rem", color: "#1a1a2e" },
+  page: { padding: "2rem", maxWidth: 900, margin: "0 auto" },
+  heading: { fontSize: "1.6rem", fontWeight: 700, marginBottom: "1.5rem", color: "#f8fafc" },
   subheading: { fontSize: "1.1rem", fontWeight: 600, marginBottom: "1rem", color: "#333" },
   card: { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "1.5rem", marginBottom: "1.5rem", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" },
   form: { display: "flex", flexDirection: "column", gap: "0.85rem" },
@@ -179,7 +179,7 @@ const styles: Record<string, React.CSSProperties> = {
   label: { fontSize: "0.85rem", fontWeight: 600, color: "#555" },
   required: { color: "#e53e3e" },
   input: { padding: "0.5rem 0.75rem", border: "1px solid #cbd5e0", borderRadius: 6, fontSize: "0.95rem", outline: "none" },
-  textarea: { padding: "0.5rem 0.75rem", border: "1px solid #cbd5e0", borderRadius: 6, fontSize: "0.95rem", resize: "vertical", fontFamily: "sans-serif" },
+  textarea: { padding: "0.5rem 0.75rem", border: "1px solid #cbd5e0", borderRadius: 6, fontSize: "0.95rem", resize: "vertical" },
   btn: { alignSelf: "flex-start", padding: "0.55rem 1.4rem", background: "#0d9488", color: "#fff", border: "none", borderRadius: 7, fontWeight: 600, fontSize: "0.95rem", cursor: "pointer" },
   errorMsg: { color: "#c53030", fontSize: "0.875rem", margin: 0 },
   successMsg: { color: "#276749", fontSize: "0.875rem", margin: 0 },

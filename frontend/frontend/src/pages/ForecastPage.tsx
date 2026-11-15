@@ -17,14 +17,12 @@ interface ForecastData {
 interface StatCardProps {
   label: string;
   value: number | string;
-  icon: string;
   accent: string;
 }
 
-function StatCard({ label, value, icon, accent }: StatCardProps) {
+function StatCard({ label, value, accent }: StatCardProps) {
   return (
     <div style={{ ...styles.statCard, borderTop: `4px solid ${accent}` }}>
-      <div style={styles.statIcon}>{icon}</div>
       <div style={styles.statValue}>{value}</div>
       <div style={styles.statLabel}>{label}</div>
     </div>
@@ -94,7 +92,6 @@ export default function ForecastPage() {
       {/* ── Alert Banner ── */}
       {forecast?.alert && (
         <div style={styles.alertBanner}>
-          <span style={styles.alertIcon}>⚠️</span>
           <strong>Capacity Warning: </strong>&nbsp;{forecast.alert}
         </div>
       )}
@@ -110,19 +107,16 @@ export default function ForecastPage() {
             <StatCard
               label="Registered Participants"
               value={forecast.registered_count}
-              icon="📋"
               accent="#4f46e5"
             />
             <StatCard
               label="Attendance Rate"
               value={`${forecast.attendance_rate_percent}%`}
-              icon="📊"
               accent="#7c3aed"
             />
             <StatCard
               label="Expected Attendance"
               value={forecast.expected_attendance}
-              icon="👥"
               accent="#0d9488"
             />
           </div>
@@ -135,25 +129,21 @@ export default function ForecastPage() {
             <StatCard
               label="Seats"
               value={forecast.recommended_seats}
-              icon="🪑"
               accent="#d97706"
             />
             <StatCard
               label="Meals"
               value={forecast.recommended_meals}
-              icon="🍽️"
               accent="#dc2626"
             />
             <StatCard
               label="Badges"
               value={forecast.recommended_badges}
-              icon="🏷️"
               accent="#2563eb"
             />
             <StatCard
               label="Certificates"
               value={forecast.recommended_certificates}
-              icon="📜"
               accent="#059669"
             />
           </div>
@@ -162,8 +152,8 @@ export default function ForecastPage() {
 
       {/* ── Override Config ── */}
       <section style={styles.card}>
-        <h2 style={styles.subheading}>Override Attendance Rate</h2>
-        <p style={styles.hint}>
+        <h2 style={styles.cardSubheading}>Override Attendance Rate</h2>
+        <p style={styles.cardHint}>
           Set a custom attendance rate (%) for this conference.
           Resets when the server restarts.
         </p>
@@ -201,16 +191,16 @@ export default function ForecastPage() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: { padding: "2rem", maxWidth: 960, margin: "0 auto", fontFamily: "sans-serif" },
-  heading: { fontSize: "1.7rem", fontWeight: 700, marginBottom: "0.25rem", color: "#1a1a2e" },
-  subtitle: { color: "#666", marginBottom: "1.25rem", fontSize: "0.95rem" },
-  subheading: { fontSize: "1.05rem", fontWeight: 600, margin: "1.5rem 0 0.4rem", color: "#333" },
-  hint: { color: "#888", fontSize: "0.85rem", marginBottom: "0.75rem" },
+  page: { padding: "2rem", maxWidth: 960, margin: "0 auto" },
+  heading: { fontSize: "1.7rem", fontWeight: 700, marginBottom: "0.25rem", color: "#f8fafc" },
+  subtitle: { color: "#cbd5e1", marginBottom: "1.25rem", fontSize: "0.95rem" },
+  subheading: { fontSize: "1.05rem", fontWeight: 600, margin: "1.5rem 0 0.4rem", color: "#f1f5f9" },
+  cardSubheading: { fontSize: "1.05rem", fontWeight: 600, margin: "1.5rem 0 0.4rem", color: "#1f2937" },
+  hint: { color: "#a5b4cf", fontSize: "0.85rem", marginBottom: "0.75rem" },
+  cardHint: { color: "#657080", fontSize: "0.85rem", marginBottom: "0.75rem" },
   alertBanner: { display: "flex", alignItems: "center", gap: "0.5rem", background: "#fff5f5", border: "1px solid #fc8181", borderRadius: 8, padding: "0.85rem 1.1rem", marginBottom: "1.25rem", color: "#c53030", fontSize: "0.95rem" },
-  alertIcon: { fontSize: "1.2rem" },
   statsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: "1rem", marginBottom: "0.5rem" },
   statCard: { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "1.2rem 1rem", boxShadow: "0 1px 4px rgba(0,0,0,0.05)", textAlign: "center" },
-  statIcon: { fontSize: "1.6rem", marginBottom: "0.4rem" },
   statValue: { fontSize: "1.9rem", fontWeight: 700, color: "#1a1a2e", lineHeight: 1.2 },
   statLabel: { fontSize: "0.8rem", color: "#718096", marginTop: "0.3rem", fontWeight: 500 },
   card: { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "1.5rem", marginTop: "1.5rem", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" },

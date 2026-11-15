@@ -1,3 +1,5 @@
+from datetime import datetime
+from typing import List, Optional
 import secrets
 from datetime import datetime, timezone
 
@@ -133,9 +135,32 @@ def refund_payment(payment_id: int, db: Session = Depends(get_db), current_user:
 
 @router.get("/me")
 def get_my_payments(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # [origin/snehansha]: Serialized list of payments ordered by creation date
     return [serialize(p) for p in db.query(Payment).filter(Payment.user_id == current_user.id).order_by(Payment.created_at.desc()).all()]
 
 
+# Fix for M-24 - Author-facing registrations & payment tracking endpoint
+@router.get("/registrations/me")
+def get_my_registrations_and_payments(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    registrations = db.query(Registration).filter(Registration.user_id == current_user.id).all()
+    tracked_data = []
+    for reg in registrations:
+        payment = db.query(Payment).filter(Payment.registration_id == reg.id).first()
+        tracked_data.append({
+            "registration_id": reg.id,
+            "conference_id": reg.conference_id,
+            "registration_status": getattr(reg, "status", "confirmed"),
+            "payment": {
+                "id": payment.id,
+                "amount": payment.amount,
+                "status": payment.status,
+                "confirmed_at": payment.confirmed_at
+            } if payment else None
+        })
+    return tracked_data
+
+
+# [origin/snehansha]: Receipt generation endpoint for completed payments
 @router.get("/{payment_id}/receipt")
 def get_receipt(payment_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     payment = db.query(Payment).filter(Payment.id == payment_id).first()

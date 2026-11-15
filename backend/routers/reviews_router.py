@@ -7,7 +7,9 @@ from sqlalchemy.orm import Session
 
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
-from backend.models import ConflictOfInterest, Notification, Review, Submission, User
+from backend.models import ConflictOfInterest, Notification, Review, Submission, User, ReviewDiscussionMessage
+
+import re
 
 router = APIRouter(prefix="/reviews", tags=["Reviews"])
 
@@ -21,7 +23,8 @@ class AssignReviewerSchema(BaseModel):
 
 class SubmitReviewSchema(BaseModel):
     submission_id: int
-    score: int = Field(ge=0, le=100)
+    #score: int = Field(ge=0, le=100)
+    score: int = Field(..., ge=1, le=10, description="Score must be between 1 and 10")
     recommendation: str
     comments: Optional[str] = None
 
@@ -49,13 +52,18 @@ class ReviewOut(BaseModel):
     submission_id: int
     reviewer_id: int
     status: str
-    deadline: Optional[datetime] = None
-    score: Optional[int]
-    recommendation: Optional[str]
-    comments: Optional[str]
+    score: Optional[int] = None
+    recommendation: Optional[str] = None
+    comments: Optional[str] = None
+    
+    # Joined Paper Details (Fix for C-07)
     title: Optional[str] = None
     abstract: Optional[str] = None
-
+    keywords: Optional[str] = None
+    file_url: Optional[str] = None
+    
+    
+    deadline: Optional[datetime] = None
     originality_score: Optional[int] = None
     methodology_score: Optional[int] = None
     clarity_score: Optional[int] = None
@@ -83,7 +91,8 @@ def assign_reviewer(
         .first()
     )
     if not submission:
-        raise HTTPException(404, "Submission not found")
+        #raise HTTPException(404, "Submission not found")
+        raise HTTPException(status_code=404, detail="Submission not found")
 
     reviewer = (
         db.query(User)
@@ -91,7 +100,23 @@ def assign_reviewer(
         .first()
     )
     if not reviewer:
-        raise HTTPException(404, "Reviewer not found")
+        # raise HTTPException(404, "Reviewer not found")
+        raise HTTPException(status_code=404, detail="Reviewer not found")
+
+    # Fix for H-07: Check for duplicate assignment
+    existing_review = (
+        db.query(Review)
+        .filter(
+            Review.submission_id == payload.submission_id,
+            Review.reviewer_id == payload.reviewer_id,
+        )
+        .first()
+    )
+    if existing_review:
+        raise HTTPException(
+            status_code=400, 
+            detail="This reviewer is already assigned to this submission"
+        )
 
     conflict = (
         db.query(ConflictOfInterest)
@@ -171,11 +196,26 @@ def save_review_draft(
     review.confidence_score = payload.confidence_score
     review.confidential_comments = payload.confidential_comments
     review.status = "draft"
-
+   
     db.commit()
     db.refresh(review)
+    
+    # # Attach joined paper fields to output payload
+    # review.title = submission.title
+    # review.abstract = submission.abstract
+    # review.keywords = getattr(submission, "keywords", None)
+    # review.file_url = getattr(submission, "file_url", None)
+    
+    # return review
+# Safely fetch submission to attach joined fields
+    submission = db.query(Submission).filter(Submission.id == payload.submission_id).first()
+    if submission:
+        review.title = submission.title
+        review.abstract = submission.abstract
+        review.keywords = getattr(submission, "keywords", None)
+        review.file_url = getattr(submission, "file_url", None)
+    
     return review
-
 
 @router.post("/submit", response_model=ReviewOut)
 def submit_review(
@@ -193,11 +233,22 @@ def submit_review(
         .first()
     )
     if not review:
-        raise HTTPException(404, "Review assignment not found")
+        raise HTTPException(status_code=404, detail="Review assignment not found")
 
+    submission = db.query(Submission).filter(Submission.id == payload.submission_id).first()
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    # Fix for H-08: Mandatory comments when recommendation is 'Reject'
+    clean_recommendation = payload.recommendation.strip()
+    if clean_recommendation.lower() == "reject" and (not payload.comments or len(payload.comments.strip()) < 10):
+        raise HTTPException(
+            status_code=400,
+            detail="Detailed feedback comments (at least 10 characters) are required for a Reject recommendation"
+        )
 
     review.score = payload.score
-    review.recommendation = payload.recommendation.strip()
+    review.recommendation = clean_recommendation
     review.comments = payload.comments
 
     review.originality_score = payload.originality_score
@@ -210,11 +261,25 @@ def submit_review(
     review.status = "completed"
     review.submitted_at = datetime.utcnow()
 
+    # Automatically map review recommendation to submission status for the organizer dashboard
+    rec_lower = clean_recommendation.lower()
+    if "accept" in rec_lower:
+        submission.status = "accepted"
+    elif "reject" in rec_lower:
+        submission.status = "rejected"
+    else:
+        submission.status = "reviewed" # For revisions or general completion
 
     db.commit()
     db.refresh(review)
+    db.refresh(submission)
+    
+    review.title = submission.title
+    review.abstract = submission.abstract
+    review.keywords = getattr(submission, "keywords", None)
+    review.file_url = getattr(submission, "file_url", None)
+    
     return review
-
 
 
 @router.get("/mine", response_model=List[ReviewOut])
@@ -232,7 +297,12 @@ def list_my_reviews(
 
     result = []
 
+    #for review, submission in reviews:
     for review, submission in reviews:
+        review.title = submission.title
+        review.abstract = submission.abstract
+        review.keywords = getattr(submission, "keywords", None)
+        review.file_url = getattr(submission, "file_url", None)  
         result.append(
             ReviewOut(
                 id=review.id,
@@ -245,6 +315,13 @@ def list_my_reviews(
                 title=submission.title,
                 abstract=submission.abstract,
                 deadline=review.deadline,
+                keywords=review.keywords,
+                file_url=review.file_url,
+                originality_score=review.originality_score,
+                methodology_score=review.methodology_score,
+                clarity_score=review.clarity_score,
+                significance_score=review.significance_score,
+                confidence_score=review.confidence_score,
             )
         )
 
@@ -256,16 +333,43 @@ def list_my_reviews(
 def list_reviews_for_submission(
     submission_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(require_role("organizer")),
+    #current_user=Depends(require_role("organizer")),
+    current_user: User = Depends(get_current_user), # Allow authenticated users
 ):
-    if not db.query(Submission).filter(Submission.id == submission_id).first():
-        raise HTTPException(404, "Submission not found")
-    return (
+    # if not db.query(Submission).filter(Submission.id == submission_id).first():
+    #     #raise HTTPException(404, "Submission not found")
+    #     raise HTTPException(status_code=404, detail="Submission not found")
+    # # return (
+    # #     db.query(Review)
+    # #     .filter(Review.submission_id == submission_id)
+    # #     .all()
+    # # )
+    
+    # 1. Fetch submission first so 'submission' is defined
+    submission = db.query(Submission).filter(Submission.id == submission_id).first()
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    
+    # 2.Authorize: Only Organizers OR the Submission's Author can view reviews
+    if current_user.role != "organizer" and submission.author_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have permission to view reviews for this submission",
+        )
+    
+    reviews = (
         db.query(Review)
         .filter(Review.submission_id == submission_id)
         .all()
     )
 
+    for r in reviews:
+        r.title = submission.title 
+        r.abstract = submission.abstract 
+        r.keywords = getattr(submission, "keywords", None) 
+        r.file_url = getattr(submission, "file_url", None) 
+
+    return reviews
 @router.get("/confidential/{submission_id}")
 def get_confidential_review_comments(
     submission_id: int,
@@ -435,4 +539,155 @@ def get_review_draft(
         "confidence_score": review.confidence_score,
         "confidential_comments": review.confidential_comments,
         "status": review.status,
+    }
+class DiscussionMessageCreate(BaseModel):
+    message: str = Field(min_length=1, max_length=3000)
+
+
+@router.get("/{submission_id}/discussion")
+def get_review_discussion(
+    submission_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    submission = db.query(Submission).filter(
+        Submission.id == submission_id
+    ).first()
+
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    if current_user.role not in ("organizer", "author", "reviewer"):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if current_user.role == "author" and submission.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if current_user.role == "reviewer":
+        assigned = db.query(Review).filter(
+            Review.submission_id == submission_id,
+            Review.reviewer_id == current_user.id,
+        ).first()
+        if not assigned:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    messages = (
+        db.query(ReviewDiscussionMessage)
+        .filter(ReviewDiscussionMessage.submission_id == submission_id)
+        .order_by(ReviewDiscussionMessage.created_at.asc())
+        .all()
+    )
+
+    return [
+        {
+            "id": item.id,
+            "submission_id": item.submission_id,
+            "user_id": item.user_id,
+            "message": item.message,
+            "created_at": item.created_at,
+        }
+        for item in messages
+    ]
+
+
+@router.post("/{submission_id}/discussion", status_code=201)
+def post_review_discussion(
+    submission_id: int,
+    payload: DiscussionMessageCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    submission = db.query(Submission).filter(
+        Submission.id == submission_id
+    ).first()
+
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    if current_user.role not in ("organizer", "author", "reviewer"):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if current_user.role == "author" and submission.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if current_user.role == "reviewer":
+        assigned = db.query(Review).filter(
+            Review.submission_id == submission_id,
+            Review.reviewer_id == current_user.id,
+        ).first()
+        if not assigned:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    message_text = payload.message.strip()
+    if not message_text:
+        raise HTTPException(status_code=422, detail="Message cannot be blank")
+
+    item = ReviewDiscussionMessage(
+        submission_id=submission_id,
+        user_id=current_user.id,
+        message=message_text,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    return {
+        "id": item.id,
+        "submission_id": item.submission_id,
+        "user_id": item.user_id,
+        "message": item.message,
+        "created_at": item.created_at,
+    }
+
+
+@router.get("/similarity/{submission_id}")
+def check_submission_similarity(
+    submission_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("organizer")),
+):
+    from collections import Counter
+    from math import sqrt
+
+    submission = db.query(Submission).filter(
+        Submission.id == submission_id
+    ).first()
+
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    def words(text: str) -> Counter:
+        return Counter(re.findall(r"\b[a-zA-Z0-9]+\b", text.lower()))
+
+    def cosine_similarity(a: Counter, b: Counter) -> float:
+        dot = sum(count * b.get(word, 0) for word, count in a.items())
+        norm_a = sqrt(sum(value * value for value in a.values()))
+        norm_b = sqrt(sum(value * value for value in b.values()))
+        return dot / (norm_a * norm_b) if norm_a and norm_b else 0.0
+
+    target_text = words(f"{submission.title} {submission.abstract}")
+    others = db.query(Submission).filter(
+        Submission.conference_id == submission.conference_id,
+        Submission.id != submission_id,
+    ).all()
+
+    matches = []
+    for other in others:
+        other_text = words(f"{other.title} {other.abstract}")
+        score = cosine_similarity(target_text, other_text) * 100
+        if score >= 30:
+            matches.append({
+                "submission_id": other.id,
+                "title": other.title,
+                "similarity_percent": round(score, 2),
+                "flagged": score >= 60,
+            })
+
+    matches.sort(key=lambda item: item["similarity_percent"], reverse=True)
+
+    return {
+        "submission_id": submission_id,
+        "method": "TF cosine similarity on title and abstract",
+        "notice": "Similarity screening only; flagged matches require human review and do not prove plagiarism.",
+        "matches": matches,
     }
