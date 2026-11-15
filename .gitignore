@@ -1,8 +1,27 @@
-.venv/
+# Large preprocessed datasets
+preprocessed_dataset/final_preprocessed_dataset_nlp.csv
+preprocessed_dataset/cleaned_nlp_dataset.csv
+
+# Trained Models & Checkpoints (.pkl, .npy, and model directories)
+*.pkl
+*.npy
+bert/
+distilbert/
+bert_saved/
+distilbert_saved/
+deep_learning/
+
+# Python
 __pycache__/
 *.py[cod]
-*.db
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment variables
 .env
-node_modules/
-dist/
-*.log
+
+# IDE
+.vscode/
