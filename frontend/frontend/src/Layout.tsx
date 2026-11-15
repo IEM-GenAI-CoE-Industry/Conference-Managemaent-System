@@ -89,7 +89,6 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: "100vh",
     background: "linear-gradient(135deg, #07111f 0%, #0d172a 38%, #111827 100%)",
     color: "#e2e8f0",
-    fontFamily: "Inter, system-ui, sans-serif",
   },
   sidebar: {
     width: 260,

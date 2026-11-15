@@ -381,7 +381,6 @@ const postDiscussion = async () => {
         backgroundColor: '#F8FAFC',
         minHeight: '100vh',
         padding: '32px 24px',
-        fontFamily: 'Inter, system-ui, sans-serif',
         boxSizing: 'border-box',
       }}
     >
@@ -791,7 +790,7 @@ const postDiscussion = async () => {
                         </label>
                         {recommendation.toLowerCase() === 'reject' && comments.trim().length < 10 && (
                           <span style={{ color: '#DC2626', fontSize: '0.75rem', fontWeight: 700 }}>
-                            ⚠️ Cannot be blank*
+                            Cannot be blank*
                           </span>
                         )}
                       </div>
@@ -993,11 +992,11 @@ const postDiscussion = async () => {
     onClick={(e) => e.stopPropagation()} // Prevents event bubbling/routing loops
     style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: '#4F46E5', color: '#FFFFFF', padding: '8px 14px', borderRadius: '6px', fontSize: '0.875rem', fontWeight: 600, textDecoration: 'none' }}
   >
-    📄 View / Download Manuscript PDF
+    View / Download Manuscript PDF
   </a>
 ) : (
   <span style={{ fontSize: '0.875rem', color: '#D97706', fontStyle: 'italic' }}>
-    ⚠️ No manuscript file URL attached.
+    No manuscript file URL attached.
   </span>
 )}
                   </div>

@@ -13,6 +13,7 @@ function formatTime(value: string) {
 }
 
 export default function SessionsPage() {
+  const isOrganizer = localStorage.getItem("role") === "organizer";
   const [conferences, setConferences] = useState<ConferenceOption[]>([]);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [form, setForm] = useState(initialForm);
@@ -41,6 +42,12 @@ export default function SessionsPage() {
 
   async function loadChoices() {
     try {
+      if (!isOrganizer) {
+        const conferenceResponse = await api.get("/conferences/");
+        setConferences(conferenceResponse.data);
+        return;
+      }
+
       const [conferenceResponse, speakerResponse] = await Promise.all([api.get("/conferences/"), api.get("/sessions/speakers")]);
       setConferences(conferenceResponse.data);
       setSpeakers(speakerResponse.data);
@@ -99,9 +106,9 @@ export default function SessionsPage() {
   }
 
   return <div className="module-page">
-    <div className="page-heading"><div><p className="eyebrow">PROGRAMME BUILDER</p><h1>Sessions and schedule</h1><p className="subtitle">Build a conflict-aware programme with named conferences and speakers.</p></div></div>
+    <div className="page-heading"><div><p className="eyebrow">PROGRAMME BUILDER</p><h1>Sessions and schedule</h1><p className="subtitle">{isOrganizer ? "Build a conflict-aware programme with named conferences and speakers." : "Browse the conference programme and speaker schedule."}</p></div></div>
     {error && <div className="error">{error}</div>}
-    <section className="form-panel"><h2>Create session</h2><form className="field-grid" onSubmit={createSession}>
+    {isOrganizer && <section className="form-panel"><h2>Create session</h2><form className="field-grid" onSubmit={createSession}>
       <label>Conference<select value={form.conference_id} onChange={(event) => setForm({ ...form, conference_id: event.target.value })} required><option value="">Choose a conference</option>{conferences.map((conference) => <option key={conference.id} value={conference.id}>{conference.name}</option>)}</select></label>
       <label>Speaker<select value={form.speaker_id} onChange={(event) => setForm({ ...form, speaker_id: event.target.value })}><option value="">Assign later</option>{speakers.map((speaker) => <option key={speaker.id} value={speaker.id}>{speaker.name} ({speaker.email})</option>)}</select></label>
       <label className="span-two">Session title<input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required /></label>
@@ -111,12 +118,12 @@ export default function SessionsPage() {
       <label>Room capacity<input type="number" min="2" value={form.room_capacity} onChange={(event) => setForm({ ...form, room_capacity: event.target.value })} required /></label>
       <label>Expected attendees<input type="number" min="0" max={form.room_capacity || undefined} value={form.expected_attendees} onChange={(event) => setForm({ ...form, expected_attendees: event.target.value })} required /></label>
       <div className="span-two"><button disabled={loading}>{loading ? "Saving..." : "Create session"}</button></div>
-      </form></section>
+      </form></section>}
       <section className="agenda-panel"><div className="section-heading"><div><h2>Conference agenda</h2><span>Times are shown in your local timezone.</span></div><input
       type="search"
       placeholder="Filter by session title or room"
       value={sessionFilter}
       onChange={(event) => setSessionFilter(event.target.value)}/>
-      <select value={selectedConferenceId} onChange={(event) => { setSelectedConferenceId(event.target.value); loadAgenda(event.target.value); }}><option value="">Choose a conference</option>{conferences.map((conference) => <option key={conference.id} value={conference.id}>{conference.name}</option>)}</select></div>{agenda ? <><h3>{agenda.conference.name}</h3>{filteredSessions.length ? <div className="session-list">{filteredSessions.map((session) => <article className="session-row" key={session.id}><div><span className="time-range">{formatTime(session.start_time)} - {formatTime(session.end_time)}</span><h3>{session.title}</h3><p>{session.location} | {session.expected_attendees}/{session.room_capacity} expected attendees</p></div><div className="speaker-control"><span>{session.speaker_id ? `Speaker #${session.speaker_id}${session.speaker_confirmed ? " confirmed" : " pending"}` : "No speaker assigned"}</span><select value={assignments[session.id] || ""} onChange={(event) => setAssignments({ ...assignments, [session.id]: event.target.value })}><option value="">Choose speaker</option>{speakers.map((speaker) => <option key={speaker.id} value={speaker.id}>{speaker.name}</option>)}</select><button type="button" className="secondary-button" onClick={() => assignSpeaker(session.id)}>Assign</button></div></article>)}</div> : <p className="empty-state">No sessions have been added to this conference yet.</p>}</> : <p className="empty-state">Choose a conference to view its agenda.</p>}</section>
+      <select value={selectedConferenceId} onChange={(event) => { setSelectedConferenceId(event.target.value); loadAgenda(event.target.value); }}><option value="">Choose a conference</option>{conferences.map((conference) => <option key={conference.id} value={conference.id}>{conference.name}</option>)}</select></div>{agenda ? <><h3>{agenda.conference.name}</h3>{filteredSessions.length ? <div className="session-list">{filteredSessions.map((session) => <article className="session-row" key={session.id}><div><span className="time-range">{formatTime(session.start_time)} - {formatTime(session.end_time)}</span><h3>{session.title}</h3><p>{session.location} | {session.expected_attendees}/{session.room_capacity} expected attendees</p></div><div className="speaker-control"><span>{session.speaker_id ? `Speaker #${session.speaker_id}${session.speaker_confirmed ? " confirmed" : " pending"}` : "No speaker assigned"}</span>{isOrganizer && <><select value={assignments[session.id] || ""} onChange={(event) => setAssignments({ ...assignments, [session.id]: event.target.value })}><option value="">Choose speaker</option>{speakers.map((speaker) => <option key={speaker.id} value={speaker.id}>{speaker.name}</option>)}</select><button type="button" className="secondary-button" onClick={() => assignSpeaker(session.id)}>Assign</button></>}</div></article>)}</div> : <p className="empty-state">No sessions have been added to this conference yet.</p>}</> : <p className="empty-state">Choose a conference to view its agenda.</p>}</section>
       </div>;
     }

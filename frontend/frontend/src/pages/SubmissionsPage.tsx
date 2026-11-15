@@ -262,7 +262,7 @@ const handleViewDetail = async (id: number) => {
   const isError = message.startsWith('Error') || message.startsWith('Auth Error');
 
   return (
-    <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', padding: '32px 24px', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', padding: '32px 24px' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         
         {/* Header Section */}
@@ -744,7 +744,7 @@ const handleViewDetail = async (id: number) => {
                       rel="noopener noreferrer"
                       style={{ color: '#2563EB', textDecoration: 'underline', fontSize: '0.875rem' }}
                     >
-                      📥 Download Manuscript PDF
+                      Download Manuscript PDF
                     </a>
                   ) : (
                     <span style={{ color: '#94A3B8', fontSize: '0.875rem' }}>No file uploaded</span>

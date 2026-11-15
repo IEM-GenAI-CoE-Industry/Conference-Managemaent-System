@@ -89,7 +89,7 @@ export default function ReviewerWorkloadPage() {
           <h2 style={styles.sectionTitle}>Reviewer Workload</h2>
 
           <button onClick={getSuggestion} style={styles.button}>
-            💡 Suggest Next Reviewer
+            Suggest Next Reviewer
           </button>
         </div>
 

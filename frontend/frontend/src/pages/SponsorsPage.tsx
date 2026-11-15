@@ -190,7 +190,7 @@ export default function SponsorsPage() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: { padding: "2rem", maxWidth: 860, margin: "0 auto", fontFamily: "sans-serif" },
+  page: { padding: "2rem", maxWidth: 860, margin: "0 auto" },
   heading: { fontSize: "1.6rem", fontWeight: 700, marginBottom: "1.5rem", color: "#1a1a2e" },
   subheading: { fontSize: "1.1rem", fontWeight: 600, marginBottom: "1rem", color: "#333" },
   card: { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "1.5rem", marginBottom: "1.5rem", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" },
