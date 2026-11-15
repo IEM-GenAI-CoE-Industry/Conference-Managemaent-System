@@ -1,95 +1,52 @@
-﻿# Conference Management System
+# Conference Management System
 
-This repository contains a working prototype for a conference management application built with a FastAPI backend and a React + TypeScript frontend. It is intended for local development, demo use, and continued prototype work rather than a production deployment.
+A local-development prototype for managing conference workflows. It uses a FastAPI backend, a React and TypeScript frontend, and a file-backed SQLite database.
 
-## What this project includes
+## Features
 
-The app currently supports the following prototype workflows:
-
-- Conference listing and detail views
-- Session and agenda browsing
-- User authentication with JWT tokens and role checks
-- Organizer/participant access patterns
-- Registration creation and per-user registration queries
-- Server-priced registration payments with gateway-style order/callback states, receipts, and refunds
-- Attendance marking and attendance lookup
-- Feedback submission and summary views
+- Conference, session, and room management
+- JWT authentication and role-based access for organizers, participants, authors, reviewers, and speakers
+- Registration and demo payment flows, including receipts and refunds
+- Submission and peer-review workflows
+- Attendance, feedback, announcements, and search
 - Sponsor and exhibitor management
-- Dashboard statistics and reviewer/speaker directory endpoints
-- Certificate generation, verification, and PDF download
-- Demo database seeding for local testing
+- Dashboard statistics, resource forecasts, room utilization, and reviewer workload
+- Certificate generation, download, and verification
 
-## Technology stack
+## Technology
 
 - Backend: Python, FastAPI, SQLAlchemy, PyJWT
-- Frontend: React, TypeScript, Vite
-- Database: SQLite (local file-backed prototype database)
-- API documentation: FastAPI OpenAPI / Swagger UI
-
-## Repository layout
-
-```text
-Conference-Managemaent-System/
-├── backend/
-│   ├── auth.py
-│   ├── database.py
-│   ├── demo_test.py
-│   ├── main.py
-│   ├── models.py
-│   ├── requirements.txt
-│   ├── seed_demo.py
-│   ├── conference.db
-│   └── routers/
-├── frontend/
-│   └── frontend/
-│       ├── package.json
-│       ├── public/
-│       └── src/
-├── LICENSE
-├── .gitignore
-├── README.md
-└── .venv/   (optional local virtual environment)
-```
+- Frontend: React 19, TypeScript, Vite, React Router, Axios
+- Database: SQLite
+- API docs: FastAPI Swagger UI
 
 ## Prerequisites
 
-- Python 3.10+
-- Node.js 18+
-- npm
-- Git
+- Python 3.10 or later
+- Node.js 20.19+ or 22.12+ and npm (required by Vite 8)
 
-## Backend setup
+## Run locally
 
-From the repository root:
+### 1. Start the backend
+
+Run these commands from the repository root in PowerShell:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r backend\requirements.txt
+uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Seed the demo database:
+On startup, the backend creates or updates the SQLite schema at `backend\conference.db` and ensures the demo accounts and sample conference data are available.
 
-```powershell
-python -m backend.seed_demo
-```
+- API: http://127.0.0.1:8000
+- Swagger UI: http://127.0.0.1:8000/docs
+- Health check: http://127.0.0.1:8000/health
 
-This creates the SQLite database used by the backend and inserts demo conference data.
+### 2. Start the frontend
 
-Start the backend:
-
-```powershell
-uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-The API is available at:
-
-- API: http://localhost:8000
-- Swagger docs: http://localhost:8000/docs
-
-## Frontend setup
-
-In a separate terminal:
+In a second terminal, from the repository root:
 
 ```powershell
 cd frontend\frontend
@@ -97,21 +54,27 @@ npm install
 npm run dev
 ```
 
-The frontend is served by Vite on:
+Open the Vite URL shown in the terminal (typically http://localhost:5173). The frontend uses `http://127.0.0.1:8000` as its API by default. To use another API URL, create `frontend\frontend\.env.local` with:
 
-- Frontend UI: http://localhost:5173
+```text
+VITE_API_URL=http://127.0.0.1:8000
+```
+
+Restart the Vite server after changing the environment file.
 
 ## Demo accounts
 
-The demo seed creates these accounts:
+All demo accounts use the password `demo123`:
 
-- Organizer: organizer@demo.com / demo123
-- Participant: participant@demo.com / demo123
-- Author: author@demo.com / demo123
-- Reviewer: reviewer@demo.com / demo123
-- Speaker: speaker@demo.com / demo123
+| Role | Email |
+| --- | --- |
+| Organizer | `organizer@demo.com` |
+| Participant | `participant@demo.com` |
+| Author | `author@demo.com` |
+| Reviewer | `reviewer@demo.com` |
+| Speaker | `speaker@demo.com` |
 
-## Validation
+## Checks and production build
 
 Run the backend smoke test from the repository root:
 
@@ -119,14 +82,19 @@ Run the backend smoke test from the repository root:
 python -m backend.demo_test
 ```
 
-This smoke test exercises the major prototype login, profile, conference, dashboard, registration, payment, and attendance flows.
+Run frontend linting and create a production build from `frontend\frontend`:
 
-## Notes
+```powershell
+npm run lint
+npm run build
+```
 
-- The project uses SQLite locally; the database file is created under the backend folder.
-- The backend initializes demo data automatically when needed.
-- Payments use an explicit `college_demo_gateway` adapter locally. It behaves like a hosted UPI/card checkout and records order and transaction references, but never collects card or UPI credentials. For deployment, replace the callback adapter with the college's Razorpay, PayU, SBI Collect, or approved provider integration and verify its signed webhook server-side.
-- This repository is a prototype and not a fully production-hardened conference platform.
+## Database and payment notes
+
+- The local database is `backend\conference.db`.
+- `python -m backend.seed_demo` recreates the demo database from scratch and **deletes existing data in that database**. Use it only when you intend to reset the local data.
+- Payments use a local `college_demo_gateway` adapter. It records demo order and transaction references and does not collect card or UPI credentials. A deployment must use an approved payment provider and validate signed webhooks server-side.
+- This is a prototype, not a production-hardened conference platform.
 
 ## License
 
