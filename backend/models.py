@@ -36,8 +36,13 @@ class Conference(Base):
     location = Column(String(250), nullable=True)
     start_date = Column(String(50), nullable=True)
     end_date = Column(String(50), nullable=True)
+    registration_fee = Column(Float, nullable=False, default=0.0)
+    seat_capacity = Column(Integer, nullable=False, default=0)
     organizer_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     created_at = Column(DateTime, default=utcnow)
+    certificate_title = Column(String(200), nullable=True)
+    certificate_body = Column(Text, nullable=True)
+    certificate_theme = Column(String(7), nullable=True)
 
     # Backward-compatible aliases used by some teammate code.
     name = synonym("title")
@@ -215,6 +220,9 @@ class Announcement(Base):
     conference_id = Column(Integer, ForeignKey("conferences.id"), nullable=False)
     title = Column(String(255), nullable=False)
     message = Column(Text, nullable=False)
+    audience = Column(String(100), nullable=False, default="all")
+    scheduled_for = Column(DateTime, nullable=True)
+    delivery_channel = Column(String(50), nullable=False, default="in-app")
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -256,3 +264,15 @@ class Notification(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User")
+
+
+class ReviewDiscussionMessage(Base):
+    __tablename__ = "review_discussion_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    submission_id = Column(
+        Integer, ForeignKey("submissions.id"), nullable=False, index=True
+    )
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    message = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
