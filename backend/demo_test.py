@@ -102,5 +102,5 @@ def run():
 
     print("ALL PROTOTYPE SMOKE TESTS PASSED")
 
-if __name__ == "__main__":
+def test_prototype_smoke():
     run()

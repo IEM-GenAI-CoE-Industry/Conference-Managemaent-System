@@ -7,6 +7,13 @@ interface Paper {
   status: string;
   title?: string;
   abstract?: string;
+  // [HEAD]: Added keywords and file_url support to Paper interface
+  keywords?: string;
+  file_url?: string;
+  score?: number;
+  recommendation?: string;
+  comments?: string;
+  // [origin/snehansha]: Added deadline tracking
   deadline?: string | null;
 }
 
@@ -94,12 +101,52 @@ export function ReviewsPage() {
   const [messageType, setMessageType] = useState<"success" | "error">("success");
 
   const [submissionReviews, setSubmissionReviews] = useState<Review[]>([]);
-  const [confidentialReviewComments, setConfidentialReviewComments] =
-    useState<ConfidentialReviewComment[]>([]);
+  const [confidentialReviewComments, setConfidentialReviewComments] = useState<
+    { review_id: number; reviewer_id: number; confidential_comments: string | null }[]
+  >([]);
+  const [searchSubmissionId, setSearchSubmissionId] = useState<string>('');
+  const [discussionMessages, setDiscussionMessages] = useState<
+  { id: number; user_id: number; message: string; created_at: string }[]
+>([]);
+const [discussionText, setDiscussionText] = useState('');
+const [discussionSubmissionId, setDiscussionSubmissionId] = useState('');
+const [discussionMessage, setDiscussionMessage] = useState('');
 
-  const [availableSubmissions, setAvailableSubmissions] = useState<SubmissionOption[]>([]);
-  const [submissionSearch, setSubmissionSearch] = useState("");
-  const [selectedSubmissionId, setSelectedSubmissionId] = useState("");
+const fetchDiscussion = async () => {
+  try {
+    const id = Number(discussionSubmissionId);
+    if (!Number.isInteger(id) || id < 1) {
+      setDiscussionMessage('Enter a valid submission ID.');
+      return;
+    }
+    const response = await api.get(`/reviews/${id}/discussion`);
+    setDiscussionMessages(response.data);
+    setDiscussionMessage('');
+  } catch {
+    setDiscussionMessage('Could not load discussion. Check your access and submission ID.');
+  }
+};
+
+const postDiscussion = async () => {
+  try {
+    const id = Number(discussionSubmissionId);
+    if (!Number.isInteger(id) || id < 1 || !discussionText.trim()) {
+      setDiscussionMessage('Enter a valid submission ID and message.');
+      return;
+    }
+    await api.post(`/reviews/${id}/discussion`, {
+      message: discussionText.trim(),
+    });
+    setDiscussionText('');
+    await fetchDiscussion();
+    setDiscussionMessage('Message posted.');
+  } catch {
+    setDiscussionMessage('Could not post message. Check your access.');
+  }
+};
+
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [deadlineFilter, setDeadlineFilter] = useState<string>('all');
 
   const [coiSubmissionId, setCoiSubmissionId] = useState("");
   const [coiSubmissionSearch, setCoiSubmissionSearch] = useState("");
@@ -146,7 +193,7 @@ export function ReviewsPage() {
     }
   };
 
-  useEffect(() => {
+  // [origin/snehansha]: Debounced review draft autosaving hook  useEffect(() => {
     if (isOrganizer) {
       void fetchAvailableSubmissions();
     } else {
@@ -162,7 +209,7 @@ export function ReviewsPage() {
 
     draftTimer.current = setTimeout(async () => {
       try {
-        await api.post("/reviews/draft", {
+        await api.post('/reviews/draft', {
           submission_id: selectedPaper.submission_id,
           score,
           recommendation,
@@ -174,9 +221,9 @@ export function ReviewsPage() {
           confidence_score: confidenceScore,
           confidential_comments: confidentialComments,
         });
-        setDraftStatus("Draft saved");
+        setDraftStatus('Draft saved');
       } catch {
-        setDraftStatus("Draft not saved yet");
+        setDraftStatus('Draft not saved yet');
       }
     }, 1000);
 
@@ -235,30 +282,37 @@ export function ReviewsPage() {
 
     if (!selectedPaper || submittingReview) return;
 
+    // [HEAD]: Enforcement for H-08 - Checking detailed comments for 'Reject'
+    if (recommendation.toLowerCase() === 'reject' && comments.trim().length < 10) {
+      setMessage('Error: Detailed feedback comments (at least 10 characters) are required for a Reject recommendation.');
+      return;
+    }
+
+    
     if (
       !window.confirm(
         "Are you sure you want to submit this review? You will not be able to edit it afterward."
       )
     ) {
-      return;
-    }
+          return;
+        }
 
     setSubmittingReview(true);
     setMessage("");
 
     try {
       await api.post("/reviews/submit", {
-        submission_id: selectedPaper.submission_id,
-        score,
-        recommendation,
-        comments,
-        originality_score: originalityScore,
-        methodology_score: methodologyScore,
-        clarity_score: clarityScore,
-        significance_score: significanceScore,
-        confidence_score: confidenceScore,
-        confidential_comments: confidentialComments,
-      });
+          submission_id: selectedPaper.submission_id,
+          score,
+          recommendation,
+          comments,
+          originality_score: originalityScore,
+          methodology_score: methodologyScore,
+          clarity_score: clarityScore,
+          significance_score: significanceScore,
+          confidence_score: confidenceScore,
+          confidential_comments: confidentialComments,
+        });
 
       setMessage("Review submitted successfully!");
       setMessageType("success");
@@ -274,86 +328,35 @@ export function ReviewsPage() {
     }
   };
 
-  const fetchReviewsForSubmission = async () => {
-    if (!selectedSubmissionId) {
-      setMessage("Please select a submission first.");
+   const fetchReviewsForSubmission = async () => {
+      if (!selectedSubmissionId) {
+        setMessage("Please select a submission first.");
       setMessageType("error");
-      return;
-    }
+        return;
+      }
 
-    setLoadingReviews(true);
+      setLoadingReviews(true);
     setMessage("");
-    setSubmissionReviews([]);
-    setConfidentialReviewComments([]);
+      setSubmissionReviews([]);
+      setConfidentialReviewComments([]);
 
     try {
-      const res = await api.get(
-        `/reviews/?submission_id=${selectedSubmissionId}`
+      const res = await api.get(`/reviews/?submission_id=${subId}`);
+      setSubmissionReviews(res.data);
+
+      const confidentialRes = await api.get(
+        `/reviews/confidential/${subId}`
       );
+      setConfidentialReviewComments(confidentialRes.data);
 
-      const reviews = Array.isArray(res.data) ? res.data : [];
-      setSubmissionReviews(reviews);
-
-      try {
-        const confidentialRes = await api.get(
-          `/reviews/confidential/${selectedSubmissionId}`
-        );
-
-        setConfidentialReviewComments(
-          Array.isArray(confidentialRes.data) ? confidentialRes.data : []
-        );
-      } catch (err) {
-        console.error("Unable to load confidential review comments:", err);
-      }
-
-      if (reviews.length === 0) {
-        setMessage("No reviews found for this submission.");
-        setMessageType("success");
+      if (res.data.length === 0) {
+        setMessage('No reviews found for this submission.');
       }
     } catch (err: any) {
-      console.error(err);
       setMessage(
-        err.response?.data?.detail || "Unable to fetch submission reviews."
+        err.response?.data?.detail || 'Failed to fetch submission reviews.'
       );
-      setMessageType("error");
-    } finally {
-      setLoadingReviews(false);
     }
-  };
-
-  const filteredSubmissions = availableSubmissions.filter((submission) => {
-    const search = submissionSearch.trim().toLowerCase();
-
-    if (!search) return true;
-
-    return (
-      String(submission.id).includes(search) ||
-      submission.title.toLowerCase().includes(search) ||
-      (submission.abstract || "").toLowerCase().includes(search)
-    );
-  });
-
-  const handleOrganizerSubmissionChange = (value: string) => {
-    setSubmissionSearch(value);
-
-    const selected = availableSubmissions.find(
-      (submission) => submission.title === value
-    );
-
-    setSelectedSubmissionId(selected ? String(selected.id) : "");
-    setSubmissionReviews([]);
-    setConfidentialReviewComments([]);
-    setMessage("");
-  };
-
-  const handleCoiSubmissionChange = (value: string) => {
-    setCoiSubmissionSearch(value);
-
-    const selected = availableSubmissions.find(
-      (submission) => submission.title === value
-    );
-
-    setCoiSubmissionId(selected ? String(selected.id) : "");
   };
 
   const declareConflict = async (e: React.FormEvent) => {
@@ -644,16 +647,31 @@ export function ReviewsPage() {
                                   "Not set"
                                 )}
                               </td>
-                              <td style={{ padding: "14px 16px" }}>
-                                {paper.status.toLowerCase() === "completed" ? (
-                                  <span style={{ color: "#64748B", fontSize: "0.875rem" }}>
-                                    Submitted
-                                  </span>
+                              <td style={{ padding: '14px 16px' }}>
+                                {paper.status.toLowerCase() === 'completed' ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedPaper(paper);
+                                      if (paper.score) setScore(paper.score);
+                                      if (paper.recommendation) setRecommendation(paper.recommendation);
+                                      if (paper.comments) setComments(paper.comments);
+                                    }}
+                                    style={{
+                                      ...buttonStyle,
+                                      backgroundColor: '#64748B',
+                                    }}
+                                  >
+                                    Edit Review
+                                  </button>
                                 ) : (
                                   <button
                                     type="button"
                                     onClick={() => {
                                       setSelectedPaper(paper);
+                                      if (paper.score) setScore(paper.score);
+                                      if (paper.recommendation) setRecommendation(paper.recommendation);
+                                      if (paper.comments) setComments(paper.comments);
                                       setMessage("");
                                       setDraftStatus("");
                                     }}
@@ -788,7 +806,7 @@ export function ReviewsPage() {
                       </select>
                     </div>
 
-                    <div>
+                    {/* <div>
                       <label htmlFor="review-comments" style={formLabelStyle}>
                         Comments:
                       </label>
@@ -800,9 +818,94 @@ export function ReviewsPage() {
                         rows={4}
                         style={{ ...formInputStyle, resize: "vertical" }}
                       />
+                    </div> */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <label htmlFor="review-comments" style={{ ...formLabelStyle, marginBottom: 0 }}>
+                          Comments:
+                        </label>
+                        {recommendation.toLowerCase() === 'reject' && comments.trim().length < 10 && (
+                          <span style={{ color: '#DC2626', fontSize: '0.75rem', fontWeight: 700 }}>
+                            Cannot be blank*
+                          </span>
+                        )}
+                      </div>
+                      <textarea
+                        id="review-comments"
+                        value={comments}
+                        onChange={(e) => setComments(e.target.value)}
+                        required
+                        rows={4}
+                        style={{
+                          ...formInputStyle,
+                          resize: 'vertical',
+                          border: recommendation.toLowerCase() === 'reject' && comments.trim().length < 10
+                            ? '2px solid #DC2626'
+                            : '1px solid #CBD5E1',
+                          backgroundColor: recommendation.toLowerCase() === 'reject' && comments.trim().length < 10
+                            ? '#FEF2F2'
+                            : '#FFFFFF',
+                        }}
+                      />
+                    </div> */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <label htmlFor="review-comments" style={{ ...formLabelStyle, marginBottom: 0 }}>
+                          Comments:
+                        </label>
+                        {recommendation.toLowerCase() === 'reject' && comments.trim().length < 10 && (
+                          <span style={{ color: '#DC2626', fontSize: '0.75rem', fontWeight: 700 }}>
+                            Cannot be blank*
+                          </span>
+                        )}
+                      </div>
+                      <textarea
+                        id="review-comments"
+                        value={comments}
+                        onChange={(e) => setComments(e.target.value)}
+                        required
+                        rows={4}
+                        style={{
+                          ...formInputStyle,
+                          resize: 'vertical',
+                          border: recommendation.toLowerCase() === 'reject' && comments.trim().length < 10
+                            ? '2px solid #DC2626'
+                            : '1px solid #CBD5E1',
+                          backgroundColor: recommendation.toLowerCase() === 'reject' && comments.trim().length < 10
+                            ? '#FEF2F2'
+                            : '#FFFFFF',
+                        }}
+                      />
                     </div>
 
-                    {rubricFields.map((item) => (
+                    {/* [origin/snehansha]: Rubric Scoring Inputs */}
+                    {[
+                      {
+                        label: 'Originality',
+                        value: originalityScore,
+                        setValue: setOriginalityScore,
+                      },
+                      {
+                        label: 'Methodology',
+                        value: methodologyScore,
+                        setValue: setMethodologyScore,
+                      },
+                      {
+                        label: 'Clarity',
+                        value: clarityScore,
+                        setValue: setClarityScore,
+                      },
+                      {
+                        label: 'Significance',
+                        value: significanceScore,
+                        setValue: setSignificanceScore,
+                      },
+                      {
+                        label: 'Reviewer Confidence',
+                        value: confidenceScore,
+                        setValue: setConfidenceScore,
+                      },
+                    ].map((item) => (
                       <div key={item.label}>
                         <label
                           htmlFor={`rubric-${item.label}`}
@@ -813,23 +916,16 @@ export function ReviewsPage() {
                         <select
                           id={`rubric-${item.label}`}
                           value={item.value}
-                          onChange={(e) =>
-                            item.setValue(Number(e.target.value))
-                          }
+                          onChange={(e) => item.setValue(Number(e.target.value))}
                           required
                           style={{
                             ...formInputStyle,
-                            backgroundColor: "#FFFFFF",
+                            backgroundColor: '#FFFFFF',
                           }}
                         >
                           {[1, 2, 3, 4, 5].map((rating) => (
                             <option key={rating} value={rating}>
-                              {rating}{" "}
-                              {rating === 1
-                                ? "— Poor"
-                                : rating === 5
-                                  ? "— Excellent"
-                                  : ""}
+                              {rating} {rating === 1 ? '— Poor' : rating === 5 ? '— Excellent' : ''}
                             </option>
                           ))}
                         </select>
@@ -854,46 +950,64 @@ export function ReviewsPage() {
                       />
                     </div>
 
-                    <div
+                    {/* <div
                       style={{
-                        display: "flex",
-                        gap: "12px",
-                        marginTop: "8px",
+                        display: 'flex',
+                        gap: '12px',
+                        marginTop: '8px',
                       }}
-                    >
-                      <button
-                        type="submit"
-                        disabled={submittingReview}
-                        style={{
-                          ...buttonStyle,
-                          flex: 1,
-                          opacity: submittingReview ? 0.6 : 1,
-                          cursor: submittingReview ? "not-allowed" : "pointer",
-                        }}
-                      >
-                        {submittingReview ? "Submitting..." : "Submit Review"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={resetReviewForm}
-                        style={{
-                          backgroundColor: "#F1F5F9",
-                          color: "#475569",
-                          border: "1px solid #CBD5E1",
-                          borderRadius: "6px",
-                          padding: "10px 18px",
-                          fontWeight: 600,
-                          cursor: "pointer",
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
+                    > */}
+                    {/* Action Buttons: Submit button validates Rejection comments before allowing submit */}
+  {(() => {
+    const isRejectionInvalid =
+      recommendation.toLowerCase() === 'reject' && comments.trim().length < 10;
+    const isSubmitDisabled = submittingReview || isRejectionInvalid;
+
+    return (
+      <div
+        style={{
+          display: "flex",
+          gap: "12px",
+          marginTop: "8px",
+        }}
+      >
+        <button
+          type="submit"
+          disabled={isSubmitDisabled}
+          style={{
+            ...buttonStyle,
+            flex: 1,
+            opacity: isSubmitDisabled ? 0.5 : 1,
+            cursor: isSubmitDisabled ? "not-allowed" : "pointer",
+            backgroundColor: isSubmitDisabled ? '#94A3B8' : '#4F46E5',
+          }}
+        >
+          {submittingReview ? "Submitting..." : "Submit Review"}
+        </button>
+        <button
+          type="button"
+          onClick={resetReviewForm}
+          style={{
+            backgroundColor: "#F1F5F9",
+            color: "#475569",
+            border: "1px solid #CBD5E1",
+            borderRadius: "6px",
+            padding: "10px 18px",
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  })()}
+</form>
                 </div>
               )}
             </div>
 
+            {/* [HEAD]: Abstract, Keywords, and Manuscript PDF view section */}
             <div
               style={{
                 backgroundColor: "#FFFFFF",
@@ -906,7 +1020,58 @@ export function ReviewsPage() {
               <h3 style={{ marginTop: 0, color: "#0F172A" }}>
                 Declare Conflict of Interest
               </h3>
-              <p style={{ color: "#64748B", fontSize: "0.875rem" }}>
+
+              {selectedPaper && (
+                <>
+                  <div style={{ marginBottom: '20px' }}>
+                    <strong style={{ color: '#334155', display: 'block', marginBottom: '4px', fontSize: '0.8125rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Abstract:
+                    </strong>
+                    <p style={{ color: '#475569', fontSize: '0.875rem', margin: 0, lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                      {selectedPaper.abstract || 'No abstract provided for this submission.'}
+                    </p>
+                  </div>
+
+                  {selectedPaper.keywords && (
+                    <div style={{ marginBottom: '16px' }}>
+                      <strong style={{ color: '#334155', display: 'block', marginBottom: '4px', fontSize: '0.8125rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Keywords:
+                      </strong>
+                      <span style={{ backgroundColor: '#EEF2FF', color: '#3730A3', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, border: '1px solid #C7D2FE' }}>
+                        {selectedPaper.keywords}
+                      </span>
+                    </div>
+                  )}
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <strong style={{ color: '#334155', display: 'block', marginBottom: '6px', fontSize: '0.8125rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Manuscript File:
+                    </strong>
+                    {selectedPaper.file_url ? (
+  <a
+    href={
+      selectedPaper.file_url.startsWith('http')
+        ? selectedPaper.file_url
+        : `http://localhost:8000${selectedPaper.file_url}`
+    }
+    target="_blank"
+    rel="noopener noreferrer"
+    onClick={(e) => e.stopPropagation()} // Prevents event bubbling/routing loops
+    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: '#4F46E5', color: '#FFFFFF', padding: '8px 14px', borderRadius: '6px', fontSize: '0.875rem', fontWeight: 600, textDecoration: 'none' }}
+  >
+    View / Download Manuscript PDF
+  </a>
+) : (
+  <span style={{ fontSize: '0.875rem', color: '#D97706', fontStyle: 'italic' }}>
+    No manuscript file URL attached.
+  </span>
+)}
+                  </div>
+                </>
+              )}
+
+              {/* [origin/snehansha]: COI description text */}
+              <p style={{ color: '#64748B', fontSize: '0.875rem' }}>
                 Declare a conflict for a submission you have a personal,
                 professional, or other relevant connection with.
               </p>
@@ -1185,6 +1350,75 @@ export function ReviewsPage() {
               )}
           </div>
         )}
+                <section
+          style={{
+            marginTop: 24,
+            padding: 24,
+            background: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            borderRadius: 12,
+          }}
+        >
+          <h2 style={{ color: '#0F172A' }}>Submission Discussion</h2>
+          <p style={{ color: '#64748B' }}>
+            Discuss a paper with users who have permission to access it.
+          </p>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input
+              type="number"
+              min={1}
+              placeholder="Submission ID"
+              value={discussionSubmissionId}
+              onChange={(e) => setDiscussionSubmissionId(e.target.value)}
+              style={{ ...formInputStyle, maxWidth: 220 }}
+            />
+            <button type="button" onClick={() => void fetchDiscussion()} style={buttonStyle}>
+              Load Discussion
+            </button>
+          </div>
+
+          {discussionMessages.map((item) => (
+            <div
+              key={item.id}
+              style={{
+                marginTop: 12,
+                padding: 12,
+                background: '#F8FAFC',
+                borderRadius: 8,
+                overflowWrap: 'anywhere',
+              }}
+            >
+              <div style={{ fontSize: 12, color: '#64748B' }}>
+                User #{item.user_id} · {new Date(item.created_at).toLocaleString()}
+              </div>
+              <div style={{ marginTop: 6, color: '#0F172A', whiteSpace: 'pre-wrap' }}>
+                {item.message}
+              </div>
+            </div>
+          ))}
+
+          <textarea
+            value={discussionText}
+            onChange={(e) => setDiscussionText(e.target.value)}
+            placeholder="Write a discussion message..."
+            maxLength={3000}
+            rows={3}
+            style={{ ...formInputStyle, marginTop: 16, resize: 'vertical' }}
+          />
+
+          <button
+            type="button"
+            onClick={() => void postDiscussion()}
+            style={{ ...buttonStyle, marginTop: 8 }}
+          >
+            Post Message
+          </button>
+
+          {discussionMessage && (
+            <p role="status" style={{ color: '#475569' }}>{discussionMessage}</p>
+          )}
+        </section>
       </div>
     </div>
   );

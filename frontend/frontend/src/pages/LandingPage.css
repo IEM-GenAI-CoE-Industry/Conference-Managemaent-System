@@ -10,7 +10,6 @@
     radial-gradient(ellipse at 4% 85%, rgba(231, 226, 255, 0.62), transparent 34%),
     radial-gradient(ellipse at 88% 8%, rgba(255, 237, 224, 0.66), transparent 32%),
     #fbfaf8;
-  font-family: 'Manrope', 'Segoe UI', sans-serif;
 }
 
 .landing-header {
@@ -138,7 +137,6 @@
 
 .landing-copy h1 span {
   color: #7161cb;
-  font-family: Georgia, serif;
   font-style: italic;
   font-weight: 400;
   letter-spacing: -0.09em;
@@ -313,7 +311,6 @@
 }
 
 .landing-image-caption strong {
-  font-family: 'Space Grotesk', sans-serif;
   font-size: clamp(25px, 3vw, 38px);
   letter-spacing: -0.06em;
 }

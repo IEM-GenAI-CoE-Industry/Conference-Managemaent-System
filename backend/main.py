@@ -108,6 +108,7 @@ Base.metadata.create_all(bind=engine)
 upgrade_sqlite_schema()
 ensure_demo_seed()
 
+
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
     format="%(asctime)s %(levelname)s %(name)s %(message)s",

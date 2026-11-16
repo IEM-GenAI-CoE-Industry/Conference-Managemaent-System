@@ -1,35 +1,15 @@
 
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import api from "../api";
 
-type Announcement = {
-  id: number;
-  title: string;
-  message: string;
-  conference_id: number;
-  created_at?: string;
-};
+type Conference = { id: number; name: string };
+type Announcement = { id: number; title: string; message: string; conference_id: number; audience: string; scheduled_for?: string | null; delivery_channel: string; };
 
-type Conference = {
-  id: number;
-  name?: string;
-  title?: string;
-  conference_name?: string;
-};
+const initialForm = { conference_id: "", title: "", message: "", audience: "all attendees", scheduled_for: "", delivery_channel: "in-app" };
 
-function getConferenceName(conference: Conference): string {
-  return (
-    conference.name ||
-    conference.title ||
-    conference.conference_name ||
-    `Conference ${conference.id}`
-  );
-}
-
-function AnnouncementsPage() {
-  const isOrganizer = localStorage.getItem("role") === "organizer";
-
+export default function AnnouncementsPage() {
   const [conferences, setConferences] = useState<Conference[]>([]);
+  const [conferenceId, setConferenceId] = useState("");
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
 
   const [createConferenceId, setCreateConferenceId] = useState("");

@@ -124,7 +124,6 @@ export function SearchPage() {
         backgroundColor: "#F8FAFC",
         minHeight: "100vh",
         padding: "32px 24px",
-        fontFamily: "Inter, system-ui, sans-serif",
       }}
     >
       <div

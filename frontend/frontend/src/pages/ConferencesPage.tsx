@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import api from "../api";
 
 type Conference = {
@@ -8,27 +8,33 @@ type Conference = {
   start_date?: string;
   end_date?: string;
   location?: string;
-  organizer_id?: number;
+  registration_fee: number;
+  seat_capacity: number;
+  registered_count: number;
+  seats_remaining: number;
 };
 
-function ConferencesPage() {
+const initialForm = {
+  name: "",
+  description: "",
+  start_date: "",
+  end_date: "",
+  location: "",
+  registration_fee: "0",
+  seat_capacity: "0",
+};
+
+function formatDate(value?: string) {
+  return value ? new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(`${value}T00:00:00`)) : "Date to be announced";
+}
+
+export default function ConferencesPage() {
   const isOrganizer = localStorage.getItem("role") === "organizer";
   const [conferences, setConferences] = useState<Conference[]>([]);
-  const [selectedConference, setSelectedConference] =
-    useState<Conference | null>(null);
-
-  const [form, setForm] = useState({
-    name: "",
-    description: "",
-    start_date: "",
-    end_date: "",
-    location: "",
-  });
-
+  const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Load all conferences
   async function loadConferences() {
     try {
       setError("");
@@ -37,36 +43,31 @@ function ConferencesPage() {
       if (!localStorage.getItem("selected_conference_id") && response.data?.length) {
         localStorage.setItem("selected_conference_id", String(response.data[0].id));
       }
-    } catch (err: any) {
-      setError(
-        err.response?.data?.detail || "Failed to load conferences."
-      );
+    } catch (caughtError: any) {
+      setError(caughtError.response?.data?.detail || "Unable to load conferences.");
     }
   }
 
-  // Create a conference
-  async function createConference(e: React.FormEvent) {
-    e.preventDefault();
+  useEffect(() => { loadConferences(); }, []);
 
+  async function createConference(event: FormEvent) {
+    event.preventDefault();
+    if (new Date(form.end_date) < new Date(form.start_date)) {
+      setError("The end date must be on or after the start date.");
+      return;
+    }
     try {
       setLoading(true);
       setError("");
-
-      await api.post("/conferences/", form);
-
-      setForm({
-        name: "",
-        description: "",
-        start_date: "",
-        end_date: "",
-        location: "",
+      await api.post("/conferences/", {
+        ...form,
+        registration_fee: Number(form.registration_fee),
+        seat_capacity: Number(form.seat_capacity),
       });
-
+      setForm(initialForm);
       await loadConferences();
-    } catch (err: any) {
-      setError(
-        err.response?.data?.detail || "Failed to create conference."
-      );
+    } catch (caughtError: any) {
+      setError(caughtError.response?.data?.detail || "Unable to create the conference.");
     } finally {
       setLoading(false);
     }

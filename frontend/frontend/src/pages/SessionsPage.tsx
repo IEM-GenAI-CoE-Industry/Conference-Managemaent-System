@@ -1,41 +1,18 @@
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import api from "../api";
 
-type Session = {
-  id: number;
-  conference_id: number;
-  title: string;
-  speaker_id?: number | null;
-  speaker_confirmed?: boolean;
-  start_time: string;
-  end_time: string;
-  location: string;
-  room_capacity: number;
-  expected_attendees?: number | null;
-};
+type ConferenceOption = { id: number; name: string; start_date?: string; end_date?: string; };
+type Speaker = { id: number; name: string; email: string; };
+type SessionItem = { id: number; conference_id: number; title: string; speaker_id?: number | null; speaker_confirmed?: boolean; start_time: string; end_time: string; location: string; room_capacity: number; expected_attendees: number; };
+type Agenda = { conference: ConferenceOption; sessions: SessionItem[]; };
 
-type Conference = {
-  id: number;
-  name?: string;
-  title?: string;
-};
+const initialForm = { conference_id: "", title: "", speaker_id: "", start_time: "", end_time: "", location: "", room_capacity: "", expected_attendees: "" };
 
-type Speaker = {
-  id: number;
-  name?: string;
-  username?: string;
-  email?: string;
-};
+function formatTime(value: string) {
+  return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
 
-type AgendaResponse = {
-  conference: {
-    id: number;
-    name: string;
-  };
-  sessions: Session[];
-};
-
-function SessionsPage() {
+export default function SessionsPage() {
   const isOrganizer = localStorage.getItem("role") === "organizer";
 
   const [conferenceId, setConferenceId] = useState("");
@@ -62,52 +39,40 @@ function SessionsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  function conferenceName(id: number | string) {
-    const conference = conferences.find((c) => String(c.id) === String(id));
-    return conference?.name || conference?.title || `Conference ${id}`;
-  }
+  const selectedConference = useMemo(() => conferences.find((conference) => String(conference.id) === form.conference_id), [conferences, form.conference_id]);
+  const filteredSessions = useMemo(() => {
+    if (!agenda) return [];
 
-  function speakerName(id?: number | null) {
-    if (!id) return "Not assigned";
-    const speaker = speakers.find((s) => s.id === id);
-    return speaker?.name || speaker?.username || speaker?.email || "Speaker not found";
-  }
+    const searchText = sessionFilter.trim().toLowerCase();
 
-  function selectConference(value: string, target: "agenda" | "form") {
-    const selected = conferences.find(
-      (c) => (c.name || c.title || `Conference ${c.id}`) === value
+    if (!searchText) {
+      return agenda.sessions;
+    }
+
+    return agenda.sessions.filter((session) =>
+      session.title.toLowerCase().includes(searchText) ||
+      session.location.toLowerCase().includes(searchText)
     );
+  }, [agenda, sessionFilter]);
 
-    if (target === "agenda") {
-      setConferenceSearch(value);
-      setConferenceId(selected ? String(selected.id) : "");
-      if (selected) {
-        localStorage.setItem("selected_conference_id", String(selected.id));
+  async function loadChoices() {
+    try {
+      if (!isOrganizer) {
+        const conferenceResponse = await api.get("/conferences/");
+        setConferences(conferenceResponse.data);
+        return;
       }
-    } else {
-      setForm((prev) => ({
-        ...prev,
-        conference_id: selected ? String(selected.id) : "",
-      }));
-      setConferenceSearch(value);
-      if (selected) {
-        localStorage.setItem("selected_conference_id", String(selected.id));
-      }
+
+      const [conferenceResponse, speakerResponse] = await Promise.all([api.get("/conferences/"), api.get("/sessions/speakers")]);
+      setConferences(conferenceResponse.data);
+      setSpeakers(speakerResponse.data);
+    } catch (caughtError: any) {
+      setError(caughtError.response?.data?.detail || "Unable to load conference and speaker choices.");
     }
   }
 
-  function selectSpeaker(value: string) {
-    setSpeakerSearch(value);
-    const selected = speakers.find(
-      (s) => (s.name || s.username || s.email || `Speaker ${s.id}`) === value
-    );
-    setForm((prev) => ({
-      ...prev,
-      speaker_id: selected ? String(selected.id) : "",
-    }));
-  }
-
-  async function loadAgenda(id: number) {
+  async function loadAgenda(conferenceId: string) {
+    if (!conferenceId) return;
     try {
       setError("");
       const response = await api.get(`/conferences/${id}/agenda`);
@@ -116,76 +81,34 @@ function SessionsPage() {
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to load conference agenda.");
       setAgenda(null);
-      setSessions([]);
     }
   }
 
-  async function createSession(e: React.FormEvent) {
-    e.preventDefault();
+  useEffect(() => { loadChoices(); }, []);
 
-    try {
-      setLoading(true);
-      setError("");
-
-      if (!form.conference_id) {
-        setError("Please select a valid conference from the suggestions.");
-        return;
-      }
-
-      if (form.speaker_id && !speakers.some((s) => String(s.id) === form.speaker_id)) {
-        setError("Please select a valid speaker from the suggestions.");
-        return;
-      }
-
-      if (new Date(form.end_time) <= new Date(form.start_time)) {
-        setError("End time must be later than start time.");
-        return;
-      }
-
-      if (
-        form.expected_attendees &&
-        Number(form.expected_attendees) > Number(form.room_capacity)
-      ) {
-        setError("Expected attendees cannot exceed room capacity.");
-        return;
-      }
-
-      const payload = {
-        conference_id: Number(form.conference_id),
-        title: form.title,
-        speaker_id: form.speaker_id ? Number(form.speaker_id) : null,
-        start_time: new Date(form.start_time).toISOString(),
-        end_time: new Date(form.end_time).toISOString(),
-        location: form.location,
-        room_capacity: Number(form.room_capacity),
-        expected_attendees: form.expected_attendees
-          ? Number(form.expected_attendees)
-          : null,
-      };
-
-      await api.post("/sessions/", payload);
-
-      const createdConferenceId = Number(form.conference_id);
-
-      setForm({
-        conference_id: String(createdConferenceId),
-        title: "",
-        speaker_id: "",
-        start_time: "",
-        end_time: "",
-        location: "",
-        room_capacity: "",
-        expected_attendees: "",
-      });
-
-      setSpeakerSearch("");
-      setConferenceId(String(createdConferenceId));
-      await loadAgenda(createdConferenceId);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to create session.");
-    } finally {
-      setLoading(false);
+  async function createSession(event: FormEvent) {
+    event.preventDefault();
+    const capacity = Number(form.room_capacity);
+    const attendees = Number(form.expected_attendees);
+    const start = new Date(form.start_time);
+    const end = new Date(form.end_time);
+    if (end <= start) { setError("The end time must be after the start time."); return; }
+    if (attendees > capacity) { setError("Expected attendees cannot be greater than room capacity."); return; }
+    if (selectedConference?.start_date && selectedConference?.end_date) {
+      const conferenceStart = new Date(`${selectedConference.start_date}T00:00:00`);
+      const conferenceEnd = new Date(`${selectedConference.end_date}T23:59:59`);
+      if (start < conferenceStart || end > conferenceEnd) { setError("Session times must be within the selected conference dates."); return; }
     }
+    try {
+      setLoading(true); setError("");
+      await api.post("/sessions/", { conference_id: Number(form.conference_id), title: form.title, speaker_id: form.speaker_id ? Number(form.speaker_id) : null, start_time: start.toISOString(), end_time: end.toISOString(), location: form.location, room_capacity: capacity, expected_attendees: attendees });
+      const conferenceId = form.conference_id;
+      setForm(initialForm);
+      setSelectedConferenceId(conferenceId);
+      await loadAgenda(conferenceId);
+    } catch (caughtError: any) {
+      setError(caughtError.response?.data?.detail || "Unable to create the session.");
+    } finally { setLoading(false); }
   }
 
   async function assignSpeaker(sessionId: number) {
