@@ -7,7 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend import models
-from backend.auth import get_current_user, require_role
+from backend.auth import get_current_user, require_role, get_current_user
 from backend.database import get_db
 
 

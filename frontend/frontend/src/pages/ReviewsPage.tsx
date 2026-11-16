@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import api from '../api';
+
+import React, { useEffect, useRef, useState } from "react";
+import api from "../api";
 
 interface Paper {
   submission_id: number;
@@ -16,6 +17,13 @@ interface Paper {
   deadline?: string | null;
 }
 
+interface SubmissionOption {
+  id: number;
+  title: string;
+  abstract?: string;
+  status: string;
+}
+
 interface Review {
   id: number;
   score: number;
@@ -23,54 +31,75 @@ interface Review {
   comments: string;
 }
 
+interface ConfidentialReviewComment {
+  review_id: number;
+  reviewer_id: number;
+  confidential_comments: string | null;
+}
+
 const tableHeaderStyle: React.CSSProperties = {
-  padding: '12px 16px',
-  fontSize: '0.8125rem',
+  padding: "12px 16px",
+  fontSize: "0.8125rem",
   fontWeight: 700,
-  color: '#475569',
-  textTransform: 'uppercase',
-  whiteSpace: 'nowrap',
+  color: "#475569",
+  textTransform: "uppercase",
+  whiteSpace: "nowrap",
 };
 
 const tableCellStyle: React.CSSProperties = {
-  padding: '14px 16px',
-  color: '#0F172A',
+  padding: "14px 16px",
+  color: "#0F172A",
   fontWeight: 600,
 };
 
 const formLabelStyle: React.CSSProperties = {
-  display: 'block',
-  fontSize: '0.875rem',
+  display: "block",
+  fontSize: "0.875rem",
   fontWeight: 600,
-  color: '#334155',
-  marginBottom: '6px',
+  color: "#334155",
+  marginBottom: "6px",
 };
 
 const formInputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '8px 12px',
-  borderRadius: '6px',
-  border: '1px solid #CBD5E1',
-  fontSize: '0.875rem',
-  outline: 'none',
-  boxSizing: 'border-box',
+  width: "100%",
+  padding: "8px 12px",
+  borderRadius: "6px",
+  border: "1px solid #CBD5E1",
+  fontSize: "0.875rem",
+  outline: "none",
+  boxSizing: "border-box",
+};
+
+const buttonStyle: React.CSSProperties = {
+  backgroundColor: "#4F46E5",
+  color: "#FFFFFF",
+  border: "none",
+  borderRadius: "6px",
+  padding: "9px 14px",
+  fontWeight: 600,
+  cursor: "pointer",
 };
 
 export function ReviewsPage() {
-  const isOrganizer = localStorage.getItem('role') === 'organizer';
+  const isOrganizer = localStorage.getItem("role") === "organizer";
 
   const [assignedPapers, setAssignedPapers] = useState<Paper[]>([]);
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
-  const [score, setScore] = useState<number>(5);
-  const [recommendation, setRecommendation] = useState<string>('Accept');
-  const [comments, setComments] = useState<string>('');
+
+  const [score, setScore] = useState(5);
+  const [recommendation, setRecommendation] = useState("Accept");
+  const [comments, setComments] = useState("");
+
   const [originalityScore, setOriginalityScore] = useState(3);
   const [methodologyScore, setMethodologyScore] = useState(3);
   const [clarityScore, setClarityScore] = useState(3);
   const [significanceScore, setSignificanceScore] = useState(3);
   const [confidenceScore, setConfidenceScore] = useState(3);
-  const [confidentialComments, setConfidentialComments] = useState('');
-  const [message, setMessage] = useState<string>('');
+  const [confidentialComments, setConfidentialComments] = useState("");
+
+  const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"success" | "error">("success");
+
   const [submissionReviews, setSubmissionReviews] = useState<Review[]>([]);
   const [confidentialReviewComments, setConfidentialReviewComments] = useState<
     { review_id: number; reviewer_id: number; confidential_comments: string | null }[]
@@ -119,37 +148,60 @@ const postDiscussion = async () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [deadlineFilter, setDeadlineFilter] = useState<string>('all');
 
-  const [coiSubmissionId, setCoiSubmissionId] = useState<string>('');
-  const [coiReason, setCoiReason] = useState<string>('');
-  const [coiMessage, setCoiMessage] = useState<string>('');
+  const [coiSubmissionId, setCoiSubmissionId] = useState("");
+  const [coiSubmissionSearch, setCoiSubmissionSearch] = useState("");
+  const [coiReason, setCoiReason] = useState("");
+  const [coiMessage, setCoiMessage] = useState("");
 
-  const [loadingPapers, setLoadingPapers] = useState<boolean>(false);
-  const [submittingReview, setSubmittingReview] = useState<boolean>(false);
-  const [declaringCoi, setDeclaringCoi] = useState<boolean>(false);
-  const [draftStatus, setDraftStatus] = useState('');
+  const [loadingSubmissions, setLoadingSubmissions] = useState(false);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [loadingPapers, setLoadingPapers] = useState(false);
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [declaringCoi, setDeclaringCoi] = useState(false);
+
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [deadlineFilter, setDeadlineFilter] = useState("all");
+  const [draftStatus, setDraftStatus] = useState("");
+
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    if (!isOrganizer) {
-      void fetchAssignedReviews();
+  const fetchAvailableSubmissions = async () => {
+    try {
+      setLoadingSubmissions(true);
+      const res = await api.get("/submissions/");
+      setAvailableSubmissions(Array.isArray(res.data) ? res.data : []);
+    } catch (err: any) {
+      console.error(err);
+      setMessage(err.response?.data?.detail || "Unable to load submissions.");
+      setMessageType("error");
+    } finally {
+      setLoadingSubmissions(false);
     }
-  }, [isOrganizer]);
+  };
 
   const fetchAssignedReviews = async () => {
     setLoadingPapers(true);
     try {
-      const res = await api.get('/reviews/mine');
-      setAssignedPapers(res.data);
+      const res = await api.get("/reviews/mine");
+      setAssignedPapers(Array.isArray(res.data) ? res.data : []);
     } catch (err: any) {
-      setMessage(
-        err.response?.data?.detail || 'Failed to load assigned papers.'
-      );
+      console.error(err);
+      setMessage(err.response?.data?.detail || "Unable to load assigned papers.");
+      setMessageType("error");
     } finally {
       setLoadingPapers(false);
     }
   };
 
-  // [origin/snehansha]: Debounced review draft autosaving hook
+  // [origin/snehansha]: Debounced review draft autosaving hook  useEffect(() => {
+    if (isOrganizer) {
+      void fetchAvailableSubmissions();
+    } else {
+      void fetchAssignedReviews();
+    }
+  }, [isOrganizer]);
+
+  // Automatically save the review as a draft while editing.
   useEffect(() => {
     if (!selectedPaper || isOrganizer || submittingReview) return;
 
@@ -195,29 +247,39 @@ const postDiscussion = async () => {
 
   const filteredPapers = assignedPapers.filter((paper) => {
     const matchesStatus =
-      statusFilter === 'all' ||
-      paper.status.toLowerCase() === statusFilter;
+      statusFilter === "all" || paper.status.toLowerCase() === statusFilter;
 
     const deadline = paper.deadline ? new Date(paper.deadline) : null;
     const validDeadline =
       deadline !== null && !Number.isNaN(deadline.getTime());
-
-    const overdue =
-      validDeadline && deadline.getTime() < Date.now();
+    const overdue = validDeadline && deadline.getTime() < Date.now();
 
     const matchesDeadline =
-      deadlineFilter === 'all' ||
-      (deadlineFilter === 'overdue' && overdue) ||
-      (deadlineFilter === 'upcoming' &&
-        validDeadline &&
-        !overdue) ||
-      (deadlineFilter === 'unset' && !paper.deadline);
+      deadlineFilter === "all" ||
+      (deadlineFilter === "overdue" && overdue) ||
+      (deadlineFilter === "upcoming" && validDeadline && !overdue) ||
+      (deadlineFilter === "unset" && !paper.deadline);
 
     return matchesStatus && matchesDeadline;
   });
 
+  const resetReviewForm = () => {
+    setSelectedPaper(null);
+    setScore(5);
+    setRecommendation("Accept");
+    setComments("");
+    setOriginalityScore(3);
+    setMethodologyScore(3);
+    setClarityScore(3);
+    setSignificanceScore(3);
+    setConfidenceScore(3);
+    setConfidentialComments("");
+    setDraftStatus("");
+  };
+
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!selectedPaper || submittingReview) return;
 
     // [HEAD]: Enforcement for H-08 - Checking detailed comments for 'Reject'
@@ -226,54 +288,57 @@ const postDiscussion = async () => {
       return;
     }
 
-    if (!window.confirm('Are you sure you want to submit this review? You will not be able to edit it afterward.')) {
-      return;
-    }
+    
+    if (
+      !window.confirm(
+        "Are you sure you want to submit this review? You will not be able to edit it afterward."
+      )
+    ) {
+          return;
+        }
 
     setSubmittingReview(true);
-    setMessage('');
+    setMessage("");
 
     try {
-      await api.post('/reviews/submit', {
-        submission_id: selectedPaper.submission_id,
-        score,
-        recommendation,
-        comments,
-        originality_score: originalityScore,
-        methodology_score: methodologyScore,
-        clarity_score: clarityScore,
-        significance_score: significanceScore,
-        confidence_score: confidenceScore,
-        confidential_comments: confidentialComments,
-      });
+      await api.post("/reviews/submit", {
+          submission_id: selectedPaper.submission_id,
+          score,
+          recommendation,
+          comments,
+          originality_score: originalityScore,
+          methodology_score: methodologyScore,
+          clarity_score: clarityScore,
+          significance_score: significanceScore,
+          confidence_score: confidenceScore,
+          confidential_comments: confidentialComments,
+        });
 
-      setMessage('Review submitted successfully!');
-      setSelectedPaper(null);
-      setComments('');
-      setConfidentialComments('');
+      setMessage("Review submitted successfully!");
+      setMessageType("success");
+      resetReviewForm();
       await fetchAssignedReviews();
     } catch (err: any) {
       setMessage(
-        `Error: ${
-          err.response?.data?.detail ||
-          err.message ||
-          'Could not submit review.'
-        }`
+        err.response?.data?.detail || err.message || "Unable to submit review."
       );
+      setMessageType("error");
     } finally {
       setSubmittingReview(false);
     }
   };
 
-  const fetchReviewsForSubmission = async (subId: string) => {
-    if (!subId.trim()) {
-      setMessage('Please enter a submission ID.');
-      return;
-    }
+   const fetchReviewsForSubmission = async () => {
+      if (!selectedSubmissionId) {
+        setMessage("Please select a submission first.");
+      setMessageType("error");
+        return;
+      }
 
-    setMessage('');
-    setSubmissionReviews([]);
-    setConfidentialReviewComments([]);
+      setLoadingReviews(true);
+    setMessage("");
+      setSubmissionReviews([]);
+      setConfidentialReviewComments([]);
 
     try {
       const res = await api.get(`/reviews/?submission_id=${subId}`);
@@ -296,113 +361,109 @@ const postDiscussion = async () => {
 
   const declareConflict = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (declaringCoi) return;
 
     const submissionId = Number(coiSubmissionId);
 
-    if (!Number.isInteger(submissionId) || submissionId <= 0) {
-      setCoiMessage('Enter a valid submission ID.');
+    if (
+      !Number.isInteger(submissionId) ||
+      submissionId <= 0 ||
+      !availableSubmissions.some((submission) => submission.id === submissionId)
+    ) {
+      setCoiMessage("Please select a valid submission from the suggestions.");
       return;
     }
 
     setDeclaringCoi(true);
-    setCoiMessage('');
+    setCoiMessage("");
 
     try {
-      const res = await api.post('/reviews/coi', {
+      const res = await api.post("/reviews/coi", {
         submission_id: submissionId,
         reason: coiReason.trim() || null,
       });
 
       setCoiMessage(
-        res.data.message || 'Conflict of interest declared successfully.'
+        res.data.message || "Conflict of interest declared successfully."
       );
-      setCoiSubmissionId('');
-      setCoiReason('');
+      setCoiSubmissionId("");
+      setCoiSubmissionSearch("");
+      setCoiReason("");
     } catch (err: any) {
       setCoiMessage(
-        err.response?.data?.detail ||
-          'Could not declare conflict of interest.'
+        err.response?.data?.detail || "Could not declare conflict of interest."
       );
     } finally {
       setDeclaringCoi(false);
     }
   };
 
-  const getRecommendationBadge = (
-    rec: string
-  ): React.CSSProperties => {
+  const getRecommendationBadge = (rec: string): React.CSSProperties => {
     const base: React.CSSProperties = {
-      padding: '4px 10px',
-      borderRadius: '9999px',
-      fontSize: '0.8125rem',
+      padding: "4px 10px",
+      borderRadius: "9999px",
+      fontSize: "0.8125rem",
       fontWeight: 600,
-      display: 'inline-block',
+      display: "inline-block",
     };
 
-    switch ((rec || '').toLowerCase()) {
-      case 'accept':
+    switch ((rec || "").toLowerCase()) {
+      case "accept":
         return {
           ...base,
-          backgroundColor: '#ECFDF5',
-          color: '#047857',
-          border: '1px solid #A7F3D0',
+          backgroundColor: "#ECFDF5",
+          color: "#047857",
+          border: "1px solid #A7F3D0",
         };
-      case 'reject':
+      case "reject":
         return {
           ...base,
-          backgroundColor: '#FEF2F2',
-          color: '#B91C1C',
-          border: '1px solid #FECACA',
+          backgroundColor: "#FEF2F2",
+          color: "#B91C1C",
+          border: "1px solid #FECACA",
         };
       default:
         return {
           ...base,
-          backgroundColor: '#FEF3C7',
-          color: '#B45309',
-          border: '1px solid #FDE68A',
+          backgroundColor: "#FEF3C7",
+          color: "#B45309",
+          border: "1px solid #FDE68A",
         };
     }
   };
 
-  const buttonStyle: React.CSSProperties = {
-    backgroundColor: '#4F46E5',
-    color: '#FFFFFF',
-    border: 'none',
-    borderRadius: '6px',
-    padding: '9px 14px',
-    fontWeight: 600,
-    cursor: 'pointer',
-  };
+  const rubricFields = [
+    { label: "Originality", value: originalityScore, setValue: setOriginalityScore },
+    { label: "Methodology", value: methodologyScore, setValue: setMethodologyScore },
+    { label: "Clarity", value: clarityScore, setValue: setClarityScore },
+    { label: "Significance", value: significanceScore, setValue: setSignificanceScore },
+    { label: "Reviewer Confidence", value: confidenceScore, setValue: setConfidenceScore },
+  ];
 
   return (
     <div
       style={{
-        backgroundColor: '#F8FAFC',
-        minHeight: '100vh',
-        padding: '32px 24px',
-        boxSizing: 'border-box',
+        backgroundColor: "#F8FAFC",
+        minHeight: "100vh",
+        padding: "32px 24px",
+        boxSizing: "border-box",
+        fontFamily: "Inter, system-ui, sans-serif",
       }}
     >
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ marginBottom: '28px' }}>
+      <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
+        <div style={{ marginBottom: "28px" }}>
           <h1
             style={{
-              fontSize: '1.75rem',
+              fontSize: "1.75rem",
               fontWeight: 700,
-              color: '#0F172A',
+              color: "#0F172A",
               margin: 0,
             }}
           >
             Reviewer &amp; Feedback Dashboard
           </h1>
-          <p
-            style={{
-              color: '#64748B',
-              fontSize: '0.925rem',
-              marginTop: '4px',
-            }}
-          >
+          <p style={{ color: "#64748B", fontSize: "0.925rem", marginTop: "4px" }}>
             Review assigned research papers, track deadlines, and declare
             conflicts of interest.
           </p>
@@ -410,18 +471,16 @@ const postDiscussion = async () => {
 
         {message && (
           <div
-            role="status"
+            role={messageType === "error" ? "alert" : "status"}
             style={{
-              padding: '12px 16px',
-              backgroundColor: message.startsWith('Error')
-                ? '#FEF2F2'
-                : '#ECFDF5',
+              padding: "12px 16px",
+              backgroundColor: messageType === "error" ? "#FEF2F2" : "#ECFDF5",
               border: `1px solid ${
-                message.startsWith('Error') ? '#FECACA' : '#A7F3D0'
+                messageType === "error" ? "#FECACA" : "#A7F3D0"
               }`,
-              color: message.startsWith('Error') ? '#B91C1C' : '#047857',
-              borderRadius: '8px',
-              marginBottom: '20px',
+              color: messageType === "error" ? "#B91C1C" : "#047857",
+              borderRadius: "8px",
+              marginBottom: "20px",
               fontWeight: 500,
             }}
           >
@@ -433,29 +492,29 @@ const postDiscussion = async () => {
           <>
             <div
               style={{
-                display: 'grid',
+                display: "grid",
                 gridTemplateColumns: selectedPaper
-                  ? 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))'
-                  : '1fr',
-                gap: '24px',
-                marginBottom: '32px',
+                  ? "repeat(auto-fit, minmax(min(100%, 380px), 1fr))"
+                  : "1fr",
+                gap: "24px",
+                marginBottom: "32px",
               }}
             >
               <div
                 style={{
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: '12px',
-                  border: '1px solid #E2E8F0',
-                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
-                  padding: '24px',
-                  overflowX: 'auto',
+                  backgroundColor: "#FFFFFF",
+                  borderRadius: "12px",
+                  border: "1px solid #E2E8F0",
+                  boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
+                  padding: "24px",
+                  overflowX: "auto",
                 }}
               >
                 <h3
                   style={{
-                    margin: '0 0 16px 0',
-                    fontSize: '1.125rem',
-                    color: '#0F172A',
+                    margin: "0 0 16px",
+                    fontSize: "1.125rem",
+                    color: "#0F172A",
                     fontWeight: 600,
                   }}
                 >
@@ -464,31 +523,18 @@ const postDiscussion = async () => {
 
                 <div
                   style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '12px',
-                    marginBottom: '16px',
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "12px",
+                    marginBottom: "16px",
                   }}
                 >
-                  <label
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      color: '#334155',
-                      fontSize: '0.875rem',
-                    }}
-                  >
-                    Status
+                  <label style={{ color: "#334155", fontSize: "0.875rem" }}>
+                    Status{" "}
                     <select
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
-                      style={{
-                        padding: '8px',
-                        borderRadius: '6px',
-                        border: '1px solid #CBD5E1',
-                        backgroundColor: '#FFFFFF',
-                      }}
+                      style={{ padding: "8px", borderRadius: "6px" }}
                     >
                       <option value="all">All statuses</option>
                       <option value="assigned">Assigned</option>
@@ -496,25 +542,12 @@ const postDiscussion = async () => {
                     </select>
                   </label>
 
-                  <label
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      color: '#334155',
-                      fontSize: '0.875rem',
-                    }}
-                  >
-                    Deadline
+                  <label style={{ color: "#334155", fontSize: "0.875rem" }}>
+                    Deadline{" "}
                     <select
                       value={deadlineFilter}
                       onChange={(e) => setDeadlineFilter(e.target.value)}
-                      style={{
-                        padding: '8px',
-                        borderRadius: '6px',
-                        border: '1px solid #CBD5E1',
-                        backgroundColor: '#FFFFFF',
-                      }}
+                      style={{ padding: "8px", borderRadius: "6px" }}
                     >
                       <option value="all">All deadlines</option>
                       <option value="upcoming">Upcoming / not overdue</option>
@@ -525,20 +558,20 @@ const postDiscussion = async () => {
                 </div>
 
                 {loadingPapers ? (
-                  <p style={{ color: '#64748B' }}>Loading assigned papers...</p>
+                  <p style={{ color: "#64748B" }}>Loading assigned papers...</p>
                 ) : (
                   <table
                     style={{
-                      width: '100%',
-                      borderCollapse: 'collapse',
-                      textAlign: 'left',
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      textAlign: "left",
                     }}
                   >
                     <thead>
                       <tr
                         style={{
-                          backgroundColor: '#F1F5F9',
-                          borderBottom: '1px solid #E2E8F0',
+                          backgroundColor: "#F1F5F9",
+                          borderBottom: "1px solid #E2E8F0",
                         }}
                       >
                         <th style={tableHeaderStyle}>ID</th>
@@ -550,7 +583,7 @@ const postDiscussion = async () => {
                     </thead>
                     <tbody>
                       {filteredPapers.length > 0 ? (
-                        filteredPapers.map((paper, index) => {
+                        filteredPapers.map((paper) => {
                           const deadline = paper.deadline
                             ? new Date(paper.deadline)
                             : null;
@@ -558,13 +591,12 @@ const postDiscussion = async () => {
                             deadline !== null &&
                             !Number.isNaN(deadline.getTime());
                           const overdue =
-                            validDeadline &&
-                            deadline.getTime() < Date.now();
+                            validDeadline && deadline.getTime() < Date.now();
 
                           return (
                             <tr
-                              key={`${paper.submission_id}-${index}`}
-                              style={{ borderBottom: '1px solid #E2E8F0' }}
+                              key={paper.submission_id}
+                              style={{ borderBottom: "1px solid #E2E8F0" }}
                             >
                               <td style={tableCellStyle}>
                                 #{paper.submission_id}
@@ -573,28 +605,27 @@ const postDiscussion = async () => {
                                 style={{
                                   ...tableCellStyle,
                                   fontWeight: 500,
-                                  minWidth: '160px',
+                                  minWidth: "160px",
                                 }}
                               >
-                                {paper.title ||
-                                  `Submission #${paper.submission_id}`}
+                                {paper.title || `Submission #${paper.submission_id}`}
                               </td>
                               <td style={tableCellStyle}>
                                 <span
                                   style={{
-                                    ...getRecommendationBadge(''),
+                                    ...getRecommendationBadge(""),
                                     backgroundColor:
-                                      paper.status.toLowerCase() === 'completed'
-                                        ? '#ECFDF5'
-                                        : '#EFF6FF',
+                                      paper.status.toLowerCase() === "completed"
+                                        ? "#ECFDF5"
+                                        : "#EFF6FF",
                                     color:
-                                      paper.status.toLowerCase() === 'completed'
-                                        ? '#047857'
-                                        : '#1D4ED8',
+                                      paper.status.toLowerCase() === "completed"
+                                        ? "#047857"
+                                        : "#1D4ED8",
                                     border:
-                                      paper.status.toLowerCase() === 'completed'
-                                        ? '1px solid #A7F3D0'
-                                        : '1px solid #BFDBFE',
+                                      paper.status.toLowerCase() === "completed"
+                                        ? "1px solid #A7F3D0"
+                                        : "1px solid #BFDBFE",
                                   }}
                                 >
                                   {paper.status}
@@ -604,16 +635,16 @@ const postDiscussion = async () => {
                                 {validDeadline ? (
                                   <span
                                     style={{
-                                      color: overdue ? '#B91C1C' : '#047857',
+                                      color: overdue ? "#B91C1C" : "#047857",
                                       fontWeight: 600,
-                                      whiteSpace: 'nowrap',
+                                      whiteSpace: "nowrap",
                                     }}
                                   >
                                     {deadline.toLocaleString()}
-                                    {overdue ? ' — OVERDUE' : ''}
+                                    {overdue ? " — OVERDUE" : ""}
                                   </span>
                                 ) : (
-                                  'Not set'
+                                  "Not set"
                                 )}
                               </td>
                               <td style={{ padding: '14px 16px' }}>
@@ -641,7 +672,8 @@ const postDiscussion = async () => {
                                       if (paper.score) setScore(paper.score);
                                       if (paper.recommendation) setRecommendation(paper.recommendation);
                                       if (paper.comments) setComments(paper.comments);
-                                      setMessage('');
+                                      setMessage("");
+                                      setDraftStatus("");
                                     }}
                                     style={buttonStyle}
                                   >
@@ -657,9 +689,9 @@ const postDiscussion = async () => {
                           <td
                             colSpan={5}
                             style={{
-                              padding: '32px',
-                              textAlign: 'center',
-                              color: '#64748B',
+                              padding: "32px",
+                              textAlign: "center",
+                              color: "#64748B",
                             }}
                           >
                             No papers match these filters.
@@ -674,52 +706,56 @@ const postDiscussion = async () => {
               {selectedPaper && (
                 <div
                   style={{
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: '12px',
-                    border: '1px solid #E2E8F0',
-                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
-                    padding: '24px',
-                    alignSelf: 'start',
+                    backgroundColor: "#FFFFFF",
+                    borderRadius: "12px",
+                    border: "1px solid #E2E8F0",
+                    boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
+                    padding: "24px",
+                    alignSelf: "start",
                   }}
                 >
                   <h3
                     style={{
-                      margin: '0 0 8px 0',
-                      fontSize: '1.125rem',
-                      color: '#0F172A',
+                      margin: "0 0 8px",
+                      fontSize: "1.125rem",
+                      color: "#0F172A",
                       fontWeight: 600,
                     }}
                   >
-                    Reviewing:{' '}
+                    Reviewing:{" "}
                     {selectedPaper.title ||
                       `Submission #${selectedPaper.submission_id}`}
                   </h3>
 
-                  <p role="status" aria-live="polite" style={{ color: '#475569', fontSize: '0.875rem' }}>
+                  <p
+                    role="status"
+                    aria-live="polite"
+                    style={{ color: "#475569", fontSize: "0.875rem" }}
+                  >
                     {draftStatus}
                   </p>
 
                   <p
                     style={{
-                      color: '#64748B',
-                      fontSize: '0.875rem',
-                      marginBottom: '20px',
-                      lineHeight: '1.5',
+                      color: "#64748B",
+                      fontSize: "0.875rem",
+                      marginBottom: "20px",
+                      lineHeight: "1.5",
                     }}
                   >
-                    <strong style={{ color: '#334155' }}>Abstract:</strong>{' '}
-                    {selectedPaper.abstract || 'No abstract available.'}
+                    <strong style={{ color: "#334155" }}>Abstract:</strong>{" "}
+                    {selectedPaper.abstract || "No abstract available."}
                   </p>
 
                   {selectedPaper.deadline && (
                     <p
                       style={{
-                        color: '#B45309',
-                        fontSize: '0.875rem',
-                        marginBottom: '16px',
+                        color: "#B45309",
+                        fontSize: "0.875rem",
+                        marginBottom: "16px",
                       }}
                     >
-                      <strong>Review deadline:</strong>{' '}
+                      <strong>Review deadline:</strong>{" "}
                       {new Date(selectedPaper.deadline).toLocaleString()}
                     </p>
                   )}
@@ -727,9 +763,9 @@ const postDiscussion = async () => {
                   <form
                     onSubmit={handleReviewSubmit}
                     style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '16px',
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "16px",
                     }}
                   >
                     <div>
@@ -749,7 +785,10 @@ const postDiscussion = async () => {
                     </div>
 
                     <div>
-                      <label htmlFor="review-recommendation" style={formLabelStyle}>
+                      <label
+                        htmlFor="review-recommendation"
+                        style={formLabelStyle}
+                      >
                         Recommendation:
                       </label>
                       <select
@@ -758,7 +797,7 @@ const postDiscussion = async () => {
                         onChange={(e) => setRecommendation(e.target.value)}
                         style={{
                           ...formInputStyle,
-                          backgroundColor: '#FFFFFF',
+                          backgroundColor: "#FFFFFF",
                         }}
                       >
                         <option value="Accept">Accept</option>
@@ -777,9 +816,35 @@ const postDiscussion = async () => {
                         onChange={(e) => setComments(e.target.value)}
                         required
                         rows={4}
+                        style={{ ...formInputStyle, resize: "vertical" }}
+                      />
+                    </div> */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <label htmlFor="review-comments" style={{ ...formLabelStyle, marginBottom: 0 }}>
+                          Comments:
+                        </label>
+                        {recommendation.toLowerCase() === 'reject' && comments.trim().length < 10 && (
+                          <span style={{ color: '#DC2626', fontSize: '0.75rem', fontWeight: 700 }}>
+                            Cannot be blank*
+                          </span>
+                        )}
+                      </div>
+                      <textarea
+                        id="review-comments"
+                        value={comments}
+                        onChange={(e) => setComments(e.target.value)}
+                        required
+                        rows={4}
                         style={{
                           ...formInputStyle,
                           resize: 'vertical',
+                          border: recommendation.toLowerCase() === 'reject' && comments.trim().length < 10
+                            ? '2px solid #DC2626'
+                            : '1px solid #CBD5E1',
+                          backgroundColor: recommendation.toLowerCase() === 'reject' && comments.trim().length < 10
+                            ? '#FEF2F2'
+                            : '#FFFFFF',
                         }}
                       />
                     </div> */}
@@ -868,18 +933,20 @@ const postDiscussion = async () => {
                     ))}
 
                     <div>
-                      <label htmlFor="confidential-comments" style={formLabelStyle}>
+                      <label
+                        htmlFor="confidential-comments"
+                        style={formLabelStyle}
+                      >
                         Confidential Comments (organizers only):
                       </label>
                       <textarea
                         id="confidential-comments"
                         value={confidentialComments}
-                        onChange={(e) => setConfidentialComments(e.target.value)}
+                        onChange={(e) =>
+                          setConfidentialComments(e.target.value)
+                        }
                         rows={3}
-                        style={{
-                          ...formInputStyle,
-                          resize: 'vertical',
-                        }}
+                        style={{ ...formInputStyle, resize: "vertical" }}
                       />
                     </div>
 
@@ -899,9 +966,9 @@ const postDiscussion = async () => {
     return (
       <div
         style={{
-          display: 'flex',
-          gap: '12px',
-          marginTop: '8px',
+          display: "flex",
+          gap: "12px",
+          marginTop: "8px",
         }}
       >
         <button
@@ -911,23 +978,23 @@ const postDiscussion = async () => {
             ...buttonStyle,
             flex: 1,
             opacity: isSubmitDisabled ? 0.5 : 1,
-            cursor: isSubmitDisabled ? 'not-allowed' : 'pointer',
+            cursor: isSubmitDisabled ? "not-allowed" : "pointer",
             backgroundColor: isSubmitDisabled ? '#94A3B8' : '#4F46E5',
           }}
         >
-          {submittingReview ? 'Submitting...' : 'Submit Review'}
+          {submittingReview ? "Submitting..." : "Submit Review"}
         </button>
         <button
           type="button"
-          onClick={() => setSelectedPaper(null)}
+          onClick={resetReviewForm}
           style={{
-            backgroundColor: '#F1F5F9',
-            color: '#475569',
-            border: '1px solid #CBD5E1',
-            borderRadius: '6px',
-            padding: '10px 18px',
+            backgroundColor: "#F1F5F9",
+            color: "#475569",
+            border: "1px solid #CBD5E1",
+            borderRadius: "6px",
+            padding: "10px 18px",
             fontWeight: 600,
-            cursor: 'pointer',
+            cursor: "pointer",
           }}
         >
           Cancel
@@ -943,14 +1010,14 @@ const postDiscussion = async () => {
             {/* [HEAD]: Abstract, Keywords, and Manuscript PDF view section */}
             <div
               style={{
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: '12px',
-                padding: '24px',
-                marginBottom: '32px',
+                backgroundColor: "#FFFFFF",
+                border: "1px solid #E2E8F0",
+                borderRadius: "12px",
+                padding: "24px",
+                marginBottom: "32px",
               }}
             >
-              <h3 style={{ marginTop: 0, color: '#0F172A' }}>
+              <h3 style={{ marginTop: 0, color: "#0F172A" }}>
                 Declare Conflict of Interest
               </h3>
 
@@ -1006,33 +1073,40 @@ const postDiscussion = async () => {
               {/* [origin/snehansha]: COI description text */}
               <p style={{ color: '#64748B', fontSize: '0.875rem' }}>
                 Declare a conflict for a submission you have a personal,
-                professional, or other relevant connection with. This action
-                uses the backend COI declaration endpoint.
+                professional, or other relevant connection with.
               </p>
 
               <form
                 onSubmit={declareConflict}
                 style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                  maxWidth: '600px',
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                  maxWidth: "600px",
                 }}
               >
                 <div>
-                  <label htmlFor="coi-submission-id" style={formLabelStyle}>
-                    Submission ID
+                  <label htmlFor="coi-submission" style={formLabelStyle}>
+                    Search Submission
                   </label>
                   <input
-                    id="coi-submission-id"
-                    type="number"
-                    min={1}
+                    id="coi-submission"
+                    type="text"
+                    list="coi-submissions"
+                    placeholder="Search submission by title"
+                    value={coiSubmissionSearch}
+                    onChange={(e) => handleCoiSubmissionChange(e.target.value)}
                     required
-                    placeholder="Enter submission ID"
-                    value={coiSubmissionId}
-                    onChange={(e) => setCoiSubmissionId(e.target.value)}
                     style={formInputStyle}
                   />
+                  <datalist id="coi-submissions">
+                    {availableSubmissions.map((submission) => (
+                      <option
+                        key={submission.id}
+                        value={submission.title}
+                      />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div>
@@ -1054,13 +1128,13 @@ const postDiscussion = async () => {
                   disabled={declaringCoi}
                   style={{
                     ...buttonStyle,
-                    alignSelf: 'flex-start',
-                    backgroundColor: '#B91C1C',
+                    alignSelf: "flex-start",
+                    backgroundColor: "#B91C1C",
                     opacity: declaringCoi ? 0.6 : 1,
-                    cursor: declaringCoi ? 'not-allowed' : 'pointer',
+                    cursor: declaringCoi ? "not-allowed" : "pointer",
                   }}
                 >
-                  {declaringCoi ? 'Submitting...' : 'Declare Conflict'}
+                  {declaringCoi ? "Submitting..." : "Declare Conflict"}
                 </button>
               </form>
 
@@ -1068,9 +1142,10 @@ const postDiscussion = async () => {
                 <p
                   role="status"
                   style={{
-                    color: coiMessage.toLowerCase().includes('could not')
-                      ? '#B91C1C'
-                      : '#334155',
+                    color: coiMessage.toLowerCase().includes("could not") ||
+                      coiMessage.toLowerCase().includes("valid")
+                      ? "#B91C1C"
+                      : "#334155",
                     marginBottom: 0,
                   }}
                 >
@@ -1084,18 +1159,18 @@ const postDiscussion = async () => {
         {isOrganizer && (
           <div
             style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '12px',
-              border: '1px solid #E2E8F0',
-              boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
-              padding: '24px',
+              backgroundColor: "#FFFFFF",
+              borderRadius: "12px",
+              border: "1px solid #E2E8F0",
+              boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
+              padding: "24px",
             }}
           >
             <h2
               style={{
-                margin: '0 0 16px 0',
-                fontSize: '1.25rem',
-                color: '#0F172A',
+                margin: "0 0 16px",
+                fontSize: "1.25rem",
+                color: "#0F172A",
                 fontWeight: 700,
               }}
             >
@@ -1104,74 +1179,151 @@ const postDiscussion = async () => {
 
             <div
               style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '12px',
-                marginBottom: '24px',
-                maxWidth: '500px',
+                display: "flex",
+                flexDirection: "column",
+                gap: "12px",
+                marginBottom: "24px",
+                maxWidth: "500px",
               }}
             >
+              <label
+                htmlFor="submission-search"
+                style={{ fontWeight: 600, color: "#334155" }}
+              >
+                Search submission by title or ID
+              </label>
               <input
-                type="number"
-                min={1}
-                placeholder="Enter Submission ID"
-                value={searchSubmissionId}
-                onChange={(e) => setSearchSubmissionId(e.target.value)}
-                style={{ ...formInputStyle, flex: 1, minWidth: '180px' }}
+                id="submission-search"
+                type="text"
+                placeholder="Search submission title or ID..."
+                value={submissionSearch}
+                onChange={(e) => {
+                  setSubmissionSearch(e.target.value);
+                  setSelectedSubmissionId("");
+                  setSubmissionReviews([]);
+                  setConfidentialReviewComments([]);
+                }}
+                style={formInputStyle}
               />
+
+              <label
+                htmlFor="submission-select"
+                style={{ fontWeight: 600, color: "#334155" }}
+              >
+                Select Submission
+              </label>
+              <input
+                id="submission-select"
+                type="text"
+                list="review-submissions"
+                placeholder={
+                  loadingSubmissions
+                    ? "Loading submissions..."
+                    : "Search submission by title"
+                }
+                value={
+                  availableSubmissions.find(
+                    (submission) =>
+                      String(submission.id) === selectedSubmissionId
+                  )?.title || ""
+                }
+                onChange={(e) =>
+                  handleOrganizerSubmissionChange(e.target.value)
+                }
+                style={{
+                  ...formInputStyle,
+                  backgroundColor: "#FFFFFF",
+                }}
+                disabled={loadingSubmissions}
+              />
+
+              <datalist id="review-submissions">
+                {filteredSubmissions.map((submission) => (
+                  <option
+                    key={submission.id}
+                    value={submission.title}
+                  />
+                ))}
+              </datalist>
+
+              {!loadingSubmissions && availableSubmissions.length === 0 && (
+                <p style={{ color: "#64748B", margin: 0 }}>
+                  No submissions found.
+                </p>
+              )}
+
+              {!loadingSubmissions &&
+                availableSubmissions.length > 0 &&
+                filteredSubmissions.length === 0 && (
+                  <p style={{ color: "#B91C1C", margin: 0 }}>
+                    No matching submissions found.
+                  </p>
+                )}
+
               <button
                 type="button"
-                onClick={() =>
-                  void fetchReviewsForSubmission(searchSubmissionId)
-                }
-                style={buttonStyle}
+                onClick={() => void fetchReviewsForSubmission()}
+                disabled={!selectedSubmissionId || loadingReviews}
+                style={{
+                  ...buttonStyle,
+                  width: "fit-content",
+                  cursor:
+                    selectedSubmissionId && !loadingReviews
+                      ? "pointer"
+                      : "not-allowed",
+                  opacity: selectedSubmissionId ? 1 : 0.6,
+                }}
               >
-                Fetch Reviews
+                {loadingReviews ? "Loading Reviews..." : "Fetch Reviews"}
               </button>
             </div>
 
+            {loadingReviews && (
+              <p style={{ color: "#64748B" }}>Fetching reviews...</p>
+            )}
+
             {submissionReviews.length > 0 && (
-              <div style={{ overflowX: 'auto' }}>
+              <div style={{ overflowX: "auto" }}>
                 <table
                   style={{
-                    width: '100%',
-                    borderCollapse: 'collapse',
-                    textAlign: 'left',
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    textAlign: "left",
                   }}
                 >
                   <thead>
                     <tr
                       style={{
-                        backgroundColor: '#F1F5F9',
-                        borderBottom: '1px solid #E2E8F0',
+                        backgroundColor: "#F1F5F9",
+                        borderBottom: "1px solid #E2E8F0",
                       }}
                     >
                       <th style={tableHeaderStyle}>Review ID</th>
                       <th style={tableHeaderStyle}>Score</th>
                       <th style={tableHeaderStyle}>Recommendation</th>
                       <th style={tableHeaderStyle}>Comments</th>
-                      <th style={tableHeaderStyle}>Confidential Comments (Organizer Only)</th>
+                      <th style={tableHeaderStyle}>
+                        Confidential Comments (Organizer Only)
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {submissionReviews.map((rev) => (
                       <tr
                         key={rev.id}
-                        style={{ borderBottom: '1px solid #E2E8F0' }}
+                        style={{ borderBottom: "1px solid #E2E8F0" }}
                       >
                         <td style={tableCellStyle}>#{rev.id}</td>
-                        <td style={tableCellStyle}>{rev.score} / 100</td>
-                        <td style={{ padding: '14px 16px' }}>
-                          <span
-                            style={getRecommendationBadge(rev.recommendation)}
-                          >
+                        <td style={tableCellStyle}>{rev.score} / 10</td>
+                        <td style={{ padding: "14px 16px" }}>
+                          <span style={getRecommendationBadge(rev.recommendation)}>
                             {rev.recommendation}
                           </span>
                         </td>
                         <td
                           style={{
-                            padding: '14px 16px',
-                            color: '#475569',
+                            padding: "14px 16px",
+                            color: "#475569",
                           }}
                         >
                           {rev.comments}
@@ -1179,7 +1331,7 @@ const postDiscussion = async () => {
                         <td style={tableCellStyle}>
                           {confidentialReviewComments.find(
                             (item) => item.review_id === rev.id
-                          )?.confidential_comments || '—'}
+                          )?.confidential_comments || "—"}
                         </td>
                       </tr>
                     ))}
@@ -1187,6 +1339,15 @@ const postDiscussion = async () => {
                 </table>
               </div>
             )}
+
+            {!loadingReviews &&
+              selectedSubmissionId &&
+              submissionReviews.length === 0 && (
+                <p style={{ color: "#64748B" }}>
+                  No reviews found for this submission, or reviews have not
+                  been fetched yet.
+                </p>
+              )}
           </div>
         )}
                 <section

@@ -37,11 +37,14 @@ export function SearchPage() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [searched, setSearched] = useState<boolean>(false);
+  const [searchError, setSearchError] = useState("");
 
   const executeSearch = async (q: string, type: SearchType) => {
     setLoading(true);
     setSearched(true);
     setResults([]);
+    setSearchError("");
+    if (!q.trim()) { setSearchError("Enter a search term to find matching results."); setLoading(false); return; }
 
     try {
       // Backend expects lowercase:
@@ -91,8 +94,8 @@ export function SearchPage() {
       }
 
       setResults(formattedResults);
-    } catch (err) {
-      console.error("Search error:", err);
+    } catch (err: any) {
+      setSearchError(err?.response?.data?.detail || err?.message || "Search failed. Please try again.");
       setResults([]);
     } finally {
       setLoading(false);
@@ -170,6 +173,7 @@ export function SearchPage() {
         </div>
 
         {/* Loading */}
+        {searchError && <p role="alert" style={{ color: "#b91c1c", marginBottom: 16 }}>{searchError}</p>}
         {loading && (
           <p
             style={{
@@ -262,7 +266,7 @@ export function SearchPage() {
                     gridColumn: "1 / -1",
                   }}
                 >
-                  No search results found.
+                  No matching results. Try a different spelling or search type.
                 </div>
               )}
         </div>

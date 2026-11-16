@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../api";
 
-const CONFERENCE_ID = 1;
+
 
 interface ForecastData {
   registered_count: number;
@@ -12,6 +12,7 @@ interface ForecastData {
   recommended_badges: number;
   recommended_certificates: number;
   alert: string | null;
+  conference_id?: number; conference_name?: string; attendance_rate_source?: string; buffer_percent?: number; assumptions?: string[];
 }
 
 interface StatCardProps {
@@ -31,6 +32,8 @@ function StatCard({ label, value, accent }: StatCardProps) {
 
 export default function ForecastPage() {
   const [forecast, setForecast] = useState<ForecastData | null>(null);
+  const [conferenceId, setConferenceId] = useState(localStorage.getItem("selected_conference_id") || "");
+  const [conferences, setConferences] = useState<Array<{id:number; name?:string; title?:string}>>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
 
@@ -43,7 +46,9 @@ export default function ForecastPage() {
     setLoading(true);
     setFetchError("");
     try {
-      const res = await api.get(`/resources/forecast?conference_id=${CONFERENCE_ID}`);
+      const id = conferenceId || localStorage.getItem("selected_conference_id") || "";
+      if (!id) { setFetchError("Select a conference on the Conferences page first."); setForecast(null); return; }
+      const res = await api.get(`/resources/forecast`, { params: { conference_id: Number(id) } });
       setForecast(res.data);
     } catch (err: any) {
       setFetchError(err?.response?.data?.detail ?? "Failed to load forecast.");
@@ -53,8 +58,14 @@ export default function ForecastPage() {
   };
 
   useEffect(() => {
-    fetchForecast();
+    api.get("/conferences/").then((res) => {
+      const list = res.data ?? []; setConferences(list);
+      const saved = localStorage.getItem("selected_conference_id");
+      const id = list.some((c: any) => String(c.id) === saved) ? saved : (list[0] ? String(list[0].id) : "");
+      setConferenceId(id); if (id) localStorage.setItem("selected_conference_id", id);
+    }).catch(() => setFetchError("Unable to load conferences. Please refresh and try again."));
   }, []);
+  useEffect(() => { if (conferenceId) fetchForecast(); }, [conferenceId]);
 
   const handleConfigSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,7 +79,7 @@ export default function ForecastPage() {
     setConfigError("");
     try {
       await api.post(
-        `/resources/forecast/config?conference_id=${CONFERENCE_ID}`,
+        `/resources/forecast/config?conference_id=${Number(conferenceId)}`,
         { attendance_rate_percent: rate }
       );
       setConfigMsg(`Attendance rate set to ${rate}%. Refreshing forecast…`);
@@ -86,8 +97,12 @@ export default function ForecastPage() {
     <div style={styles.page}>
       <h1 style={styles.heading}>Resource Forecast</h1>
       <p style={styles.subtitle}>
-        Attendance-based estimates for Conference #{CONFERENCE_ID}
+        Attendance-based estimates for the selected conference.
       </p>
+      <label htmlFor="forecast-conference">Conference</label>{" "}
+      <select id="forecast-conference" value={conferenceId} onChange={(e) => { setConferenceId(e.target.value); localStorage.setItem("selected_conference_id", e.target.value); }}>
+        <option value="">Select conference</option>{conferences.map((c) => <option key={c.id} value={c.id}>{c.name || c.title || `Conference #${c.id}`}</option>)}
+      </select>
 
       {/* ── Alert Banner ── */}
       {forecast?.alert && (
@@ -122,9 +137,9 @@ export default function ForecastPage() {
           </div>
 
           <h2 style={styles.subheading}>Recommended Quantities</h2>
-          <p style={styles.hint}>
-            Includes a 7% buffer on top of expected attendance.
-          </p>
+          <p style={styles.hint}>Includes a {forecast.buffer_percent ?? 7}% buffer on top of expected attendance.</p>
+          <p style={styles.hint}>Estimate source: {forecast.attendance_rate_source === "recorded_attendance" ? "recorded attendance history" : forecast.attendance_rate_source === "organizer_override" ? "organizer-configured rate" : "default 84% assumption (no history available)"}.</p>
+          {forecast.assumptions?.map((item) => <p key={item} style={styles.hint}>{item}</p>)}
           <div style={styles.statsGrid}>
             <StatCard
               label="Seats"
@@ -152,10 +167,9 @@ export default function ForecastPage() {
 
       {/* ── Override Config ── */}
       <section style={styles.card}>
-        <h2 style={styles.cardSubheading}>Override Attendance Rate</h2>
-        <p style={styles.cardHint}>
-          Set a custom attendance rate (%) for this conference.
-          Resets when the server restarts.
+        <h2 style={styles.subheading}>Override Attendance Rate</h2>
+        <p style={styles.hint}>
+          Set a custom attendance rate (%) for the selected conference. This setting is saved in the database.
         </p>
         <form onSubmit={handleConfigSubmit} style={styles.configForm}>
           <input
@@ -177,6 +191,7 @@ export default function ForecastPage() {
           </button>
           <button
             type="button"
+            disabled={loading || !conferenceId}
             onClick={fetchForecast}
             style={styles.refreshBtn}
           >

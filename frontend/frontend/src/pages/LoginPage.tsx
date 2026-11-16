@@ -1,7 +1,10 @@
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
 import { roleHome, roleOptions, type AppRole } from "../access";
+
+const showDemoAccounts = import.meta.env.DEV;
 
 const demoAccounts: Record<AppRole, string> = {
   organizer: "organizer@demo.com",
@@ -21,7 +24,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [conferenceCount, setConferenceCount] = useState<number | null>(null);
 
-  // Preserve the existing authentication and redirect behavior.
+  // Preserve existing authentication and redirect behavior.
   useEffect(() => {
     const existingToken = localStorage.getItem("token");
     const existingRole = localStorage.getItem("role");
@@ -39,7 +42,7 @@ export default function LoginPage() {
     }
   }, [navigate]);
 
-  // Fetch public conference data without requiring a login.
+  // Fetch public conference data without requiring login.
   useEffect(() => {
     async function fetchConferenceCount() {
       try {
@@ -76,7 +79,7 @@ export default function LoginPage() {
 
       localStorage.setItem("token", res.data.access_token);
       localStorage.setItem("role", res.data.role);
-      localStorage.setItem("user_id", res.data.user_id);
+      localStorage.setItem("user_id", String(res.data.user_id));
 
       navigate(roleHome(res.data.role), { replace: true });
     } catch (err: any) {
@@ -84,7 +87,9 @@ export default function LoginPage() {
       localStorage.removeItem("role");
       localStorage.removeItem("user_id");
 
-      setError(err.response?.data?.detail || "Login failed");
+      setError(
+        err.response?.data?.detail || "Invalid email or password"
+      );
     } finally {
       setLoading(false);
     }
@@ -126,7 +131,11 @@ export default function LoginPage() {
             <h2 style={styles.title}>Sign in</h2>
           </div>
 
-          {error && <div style={styles.error}>{error}</div>}
+          {error && (
+            <div role="alert" style={styles.error}>
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleLogin}>
             <fieldset style={styles.roleFieldset}>
@@ -157,29 +166,31 @@ export default function LoginPage() {
               </div>
             </fieldset>
 
-            <div style={styles.demoAccounts}>
-              <span style={styles.demoHint}>
-                Demo login · password: demo123
-              </span>
+            {showDemoAccounts && (
+              <div style={styles.demoAccounts}>
+                <span style={styles.demoHint}>
+                  Development demo accounts only · password: demo123
+                </span>
 
-              <div style={styles.demoButtons}>
-                {roleOptions.map((role) => (
-                  <button
-                    key={role.value}
-                    type="button"
-                    style={styles.demoButton}
-                    onClick={() => {
-                      setSelectedRole(role.value);
-                      setEmail(demoAccounts[role.value]);
-                      setPassword("demo123");
-                      setError("");
-                    }}
-                  >
-                    Use {role.label}
-                  </button>
-                ))}
+                <div style={styles.demoButtons}>
+                  {roleOptions.map((role) => (
+                    <button
+                      key={role.value}
+                      type="button"
+                      style={styles.demoButton}
+                      onClick={() => {
+                        setSelectedRole(role.value);
+                        setEmail(demoAccounts[role.value]);
+                        setPassword("demo123");
+                        setError("");
+                      }}
+                    >
+                      Use {role.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div style={styles.field}>
               <label style={styles.label} htmlFor="login-email">
@@ -237,7 +248,7 @@ export default function LoginPage() {
   );
 }
 
-const styles = {
+const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: "100vh",
     display: "flex",
@@ -265,7 +276,7 @@ const styles = {
       "linear-gradient(135deg, rgba(59,130,246,0.25), rgba(168,85,247,0.18), rgba(15,23,42,0.24))",
     padding: "52px 42px",
     display: "flex",
-    flexDirection: "column" as const,
+    flexDirection: "column",
     justifyContent: "center",
   },
   kicker: {
@@ -278,7 +289,7 @@ const styles = {
     color: "#dbeafe",
     fontSize: 12,
     letterSpacing: "0.12em",
-    textTransform: "uppercase" as const,
+    textTransform: "uppercase",
     fontWeight: 700,
   },
   heroTitle: {
@@ -318,13 +329,13 @@ const styles = {
     color: "#cbd5e1",
     fontSize: 12,
     letterSpacing: "0.08em",
-    textTransform: "uppercase" as const,
+    textTransform: "uppercase",
   },
   card: {
     background: "rgba(15, 23, 42, 0.8)",
     padding: "42px 34px",
     display: "flex",
-    flexDirection: "column" as const,
+    flexDirection: "column",
     justifyContent: "center",
   },
   headerWrap: {
@@ -335,7 +346,7 @@ const styles = {
     fontSize: 12,
     fontWeight: 800,
     letterSpacing: "0.12em",
-    textTransform: "uppercase" as const,
+    textTransform: "uppercase",
   },
   title: {
     margin: "10px 0 0",
@@ -344,7 +355,7 @@ const styles = {
   },
   field: {
     display: "flex",
-    flexDirection: "column" as const,
+    flexDirection: "column",
     gap: 8,
     marginBottom: 18,
   },
@@ -374,7 +385,7 @@ const styles = {
   },
   demoButtons: {
     display: "flex",
-    flexWrap: "wrap" as const,
+    flexWrap: "wrap",
     gap: 6,
   },
   demoButton: {
@@ -411,7 +422,7 @@ const styles = {
   },
   input: {
     width: "100%",
-    boxSizing: "border-box" as const,
+    boxSizing: "border-box",
     padding: "13px 14px",
     border: "1px solid rgba(148, 163, 184, 0.24)",
     borderRadius: 12,
@@ -434,13 +445,11 @@ const styles = {
     cursor: "pointer",
     boxShadow: "0 18px 36px rgba(96, 165, 250, 0.28)",
   },
-  
-disabledButton: {
-  opacity: 0.65,
-  cursor: "not-allowed",
-  filter: "grayscale(25%)",
-},
-
+  disabledButton: {
+    opacity: 0.65,
+    cursor: "not-allowed",
+    filter: "grayscale(25%)",
+  },
   error: {
     background: "rgba(127, 29, 29, 0.2)",
     border: "1px solid rgba(248, 113, 113, 0.28)",
@@ -452,7 +461,7 @@ disabledButton: {
   },
   footerText: {
     marginTop: 18,
-    textAlign: "center" as const,
+    textAlign: "center",
     color: "#cbd5e1",
     fontSize: 14,
   },

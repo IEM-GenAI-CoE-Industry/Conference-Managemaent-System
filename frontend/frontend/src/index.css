@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
 
 :root {
   font-family: 'Manrope', 'Segoe UI', sans-serif;
@@ -65,6 +66,40 @@ h6 {
 
 ::selection {
   background: rgba(124, 58, 237, 0.4);
+}
+
+/* Shared keyboard focus and readable form defaults */
+:focus-visible {
+  outline: 3px solid #67e8f9;
+  outline-offset: 3px;
+}
+
+button:disabled,
+input:disabled,
+select:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+label,
+.label,
+.muted,
+small {
+  color: #cbd5e1;
+}
+
+input,
+select,
+textarea {
+  color-scheme: dark;
+}
+
+[role="alert"] {
+  color: #fecaca;
+}
+
+[role="status"] {
+  color: #bbf7d0;
 }
 
 input::placeholder {

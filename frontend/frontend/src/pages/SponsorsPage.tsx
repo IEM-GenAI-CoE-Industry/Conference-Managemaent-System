@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../api";
 
-const CONFERENCE_ID = 1;
 
 type Tier = "gold" | "silver" | "bronze";
 
@@ -27,6 +26,7 @@ const TIER_BG: Record<Tier, string> = {
 
 export default function SponsorsPage() {
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
+  const [conferenceId, setConferenceId] = useState(localStorage.getItem("selected_conference_id") || "");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -39,8 +39,9 @@ export default function SponsorsPage() {
   });
 
   const fetchSponsors = async () => {
+    if (!conferenceId) { setError("Select a conference on the Conferences page first."); setLoading(false); return; }
     try {
-      const res = await api.get(`/sponsors/?conference_id=${CONFERENCE_ID}`);
+      const res = await api.get(`/sponsors/?conference_id=${Number(conferenceId)}`);
       setSponsors(res.data);
     } catch {
       setError("Failed to load sponsors.");
@@ -50,8 +51,8 @@ export default function SponsorsPage() {
   };
 
   useEffect(() => {
-    fetchSponsors();
-  }, []);
+    if (conferenceId) fetchSponsors();
+  }, [conferenceId]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>

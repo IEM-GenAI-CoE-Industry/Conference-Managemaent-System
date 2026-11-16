@@ -14,13 +14,28 @@ function formatTime(value: string) {
 
 export default function SessionsPage() {
   const isOrganizer = localStorage.getItem("role") === "organizer";
-  const [conferences, setConferences] = useState<ConferenceOption[]>([]);
+
+  const [conferenceId, setConferenceId] = useState("");
+  const [conferenceSearch, setConferenceSearch] = useState("");
+  const [agenda, setAgenda] = useState<AgendaResponse | null>(null);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [conferences, setConferences] = useState<Conference[]>([]);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
-  const [form, setForm] = useState(initialForm);
-  const [selectedConferenceId, setSelectedConferenceId] = useState("");
-  const [sessionFilter, setSessionFilter] = useState("");
-  const [agenda, setAgenda] = useState<Agenda | null>(null);
-  const [assignments, setAssignments] = useState<Record<number, string>>({});
+  const [speakerSearch, setSpeakerSearch] = useState("");
+  const [assignSpeakerIds, setAssignSpeakerIds] = useState<Record<number, string>>({});
+  const [assignSpeakerSearch, setAssignSpeakerSearch] = useState<Record<number, string>>({});
+
+  const [form, setForm] = useState({
+    conference_id: "",
+    title: "",
+    speaker_id: "",
+    start_time: "",
+    end_time: "",
+    location: "",
+    room_capacity: "",
+    expected_attendees: "",
+  });
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -60,10 +75,11 @@ export default function SessionsPage() {
     if (!conferenceId) return;
     try {
       setError("");
-      const response = await api.get(`/conferences/${conferenceId}/agenda`);
+      const response = await api.get(`/conferences/${id}/agenda`);
       setAgenda(response.data);
-    } catch (caughtError: any) {
-      setError(caughtError.response?.data?.detail || "Unable to load this agenda.");
+      setSessions(response.data.sessions ?? []);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || "Failed to load conference agenda.");
       setAgenda(null);
     }
   }
@@ -96,34 +112,430 @@ export default function SessionsPage() {
   }
 
   async function assignSpeaker(sessionId: number) {
-    const speakerId = assignments[sessionId];
-    if (!speakerId) { setError("Choose a speaker before assigning one."); return; }
+    const speakerId = assignSpeakerIds[sessionId];
+
+    if (!speakerId) {
+      setError("Please select a speaker from the suggestions.");
+      return;
+    }
+
+    if (!speakers.some((s) => String(s.id) === speakerId)) {
+      setError("Please select a valid speaker from the suggestions.");
+      return;
+    }
+
     try {
       setError("");
-      await api.post(`/sessions/${sessionId}/assign-speaker`, { speaker_id: Number(speakerId) });
-      if (selectedConferenceId) await loadAgenda(selectedConferenceId);
-    } catch (caughtError: any) { setError(caughtError.response?.data?.detail || "Unable to assign the speaker."); }
+
+      await api.post(`/sessions/${sessionId}/assign-speaker`, {
+        speaker_id: Number(speakerId),
+      });
+
+      if (conferenceId) {
+        await loadAgenda(Number(conferenceId));
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.detail || "Failed to assign speaker.");
+    }
   }
 
-  return <div className="module-page">
-    <div className="page-heading"><div><p className="eyebrow">PROGRAMME BUILDER</p><h1>Sessions and schedule</h1><p className="subtitle">{isOrganizer ? "Build a conflict-aware programme with named conferences and speakers." : "Browse the conference programme and speaker schedule."}</p></div></div>
-    {error && <div className="error">{error}</div>}
-    {isOrganizer && <section className="form-panel"><h2>Create session</h2><form className="field-grid" onSubmit={createSession}>
-      <label>Conference<select value={form.conference_id} onChange={(event) => setForm({ ...form, conference_id: event.target.value })} required><option value="">Choose a conference</option>{conferences.map((conference) => <option key={conference.id} value={conference.id}>{conference.name}</option>)}</select></label>
-      <label>Speaker<select value={form.speaker_id} onChange={(event) => setForm({ ...form, speaker_id: event.target.value })}><option value="">Assign later</option>{speakers.map((speaker) => <option key={speaker.id} value={speaker.id}>{speaker.name} ({speaker.email})</option>)}</select></label>
-      <label className="span-two">Session title<input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required /></label>
-      <label>Start time<input type="datetime-local" value={form.start_time} onChange={(event) => setForm({ ...form, start_time: event.target.value })} required /></label>
-      <label>End time<input type="datetime-local" min={form.start_time} value={form.end_time} onChange={(event) => setForm({ ...form, end_time: event.target.value })} required /></label>
-      <label>Room<input value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} required /></label>
-      <label>Room capacity<input type="number" min="2" value={form.room_capacity} onChange={(event) => setForm({ ...form, room_capacity: event.target.value })} required /></label>
-      <label>Expected attendees<input type="number" min="0" max={form.room_capacity || undefined} value={form.expected_attendees} onChange={(event) => setForm({ ...form, expected_attendees: event.target.value })} required /></label>
-      <div className="span-two"><button disabled={loading}>{loading ? "Saving..." : "Create session"}</button></div>
-      </form></section>}
-      <section className="agenda-panel"><div className="section-heading"><div><h2>Conference agenda</h2><span>Times are shown in your local timezone.</span></div><input
-      type="search"
-      placeholder="Filter by session title or room"
-      value={sessionFilter}
-      onChange={(event) => setSessionFilter(event.target.value)}/>
-      <select value={selectedConferenceId} onChange={(event) => { setSelectedConferenceId(event.target.value); loadAgenda(event.target.value); }}><option value="">Choose a conference</option>{conferences.map((conference) => <option key={conference.id} value={conference.id}>{conference.name}</option>)}</select></div>{agenda ? <><h3>{agenda.conference.name}</h3>{filteredSessions.length ? <div className="session-list">{filteredSessions.map((session) => <article className="session-row" key={session.id}><div><span className="time-range">{formatTime(session.start_time)} - {formatTime(session.end_time)}</span><h3>{session.title}</h3><p>{session.location} | {session.expected_attendees}/{session.room_capacity} expected attendees</p></div><div className="speaker-control"><span>{session.speaker_id ? `Speaker #${session.speaker_id}${session.speaker_confirmed ? " confirmed" : " pending"}` : "No speaker assigned"}</span>{isOrganizer && <><select value={assignments[session.id] || ""} onChange={(event) => setAssignments({ ...assignments, [session.id]: event.target.value })}><option value="">Choose speaker</option>{speakers.map((speaker) => <option key={speaker.id} value={speaker.id}>{speaker.name}</option>)}</select><button type="button" className="secondary-button" onClick={() => assignSpeaker(session.id)}>Assign</button></>}</div></article>)}</div> : <p className="empty-state">No sessions have been added to this conference yet.</p>}</> : <p className="empty-state">Choose a conference to view its agenda.</p>}</section>
-      </div>;
+  function handleLoadAgenda(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!conferenceId) {
+      setError("Please select a conference from the suggestions.");
+      return;
     }
+
+    loadAgenda(Number(conferenceId));
+  }
+
+  useEffect(() => {
+    api.get("/conferences/")
+      .then((res) => {
+        const list: Conference[] = res.data ?? [];
+        setConferences(list);
+
+        const saved = localStorage.getItem("selected_conference_id");
+        const selected = list.find((c) => String(c.id) === saved) || list[0];
+
+        if (selected) {
+          const id = String(selected.id);
+          const name = selected.name || selected.title || `Conference ${id}`;
+
+          setConferenceId(id);
+          setConferenceSearch(name);
+          setForm((prev) => ({
+            ...prev,
+            conference_id: prev.conference_id || id,
+          }));
+        }
+      })
+      .catch(() => setError("Unable to load conferences. Please refresh the page."));
+
+    api.get("/users/speakers/")
+      .then((res) => setSpeakers(res.data ?? []))
+      .catch(() => setSpeakers([]));
+  }, []);
+
+  useEffect(() => {
+    if (conferenceId) {
+      const name = conferenceName(conferenceId);
+      setConferenceSearch(name);
+    }
+  }, [conferenceId, conferences]);
+
+  return (
+    <main style={styles.page}>
+      <header style={styles.header}>
+        <p style={styles.eyebrow}>Program</p>
+        <h1 style={styles.title}>Sessions &amp; Schedule</h1>
+      </header>
+
+      {error && <p role="alert" style={styles.error}>{error}</p>}
+
+      {isOrganizer && (
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>Create Session</h2>
+
+          <form onSubmit={createSession} style={styles.form}>
+            <label style={styles.label}>
+              Conference
+              <input
+                style={styles.input}
+                list="session-conferences"
+                value={conferenceSearch}
+                onChange={(e) => selectConference(e.target.value, "form")}
+                placeholder="Search conference by name"
+                required
+              />
+              <datalist id="session-conferences">
+                {conferences.map((c) => (
+                  <option
+                    key={c.id}
+                    value={c.name || c.title || `Conference ${c.id}`}
+                  />
+                ))}
+              </datalist>
+            </label>
+
+            <label style={{ ...styles.label, gridColumn: "1 / -1" }}>
+              Session Title
+              <input
+                style={styles.input}
+                type="text"
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                required
+              />
+            </label>
+
+            <label style={styles.label}>
+              Speaker (optional)
+              <input
+                style={styles.input}
+                list="session-speakers"
+                value={speakerSearch}
+                onChange={(e) => selectSpeaker(e.target.value)}
+                placeholder="Search speaker by name"
+              />
+              <datalist id="session-speakers">
+                {speakers.map((sp) => (
+                  <option
+                    key={sp.id}
+                    value={sp.name || sp.username || sp.email || `Speaker ${sp.id}`}
+                  />
+                ))}
+              </datalist>
+            </label>
+
+            <label style={styles.label}>
+              Start Time
+              <input
+                style={styles.input}
+                type="datetime-local"
+                value={form.start_time}
+                onChange={(e) => setForm({ ...form, start_time: e.target.value })}
+                required
+              />
+            </label>
+
+            <label style={styles.label}>
+              End Time
+              <input
+                style={styles.input}
+                type="datetime-local"
+                value={form.end_time}
+                onChange={(e) => setForm({ ...form, end_time: e.target.value })}
+                required
+              />
+            </label>
+
+            <label style={styles.label}>
+              Room Name
+              <input
+                style={styles.input}
+                type="text"
+                value={form.location}
+                onChange={(e) => setForm({ ...form, location: e.target.value })}
+                required
+              />
+            </label>
+
+            <label style={styles.label}>
+              Room Capacity
+              <input
+                style={styles.input}
+                type="number"
+                min="1"
+                value={form.room_capacity}
+                onChange={(e) => setForm({ ...form, room_capacity: e.target.value })}
+                required
+              />
+            </label>
+
+            <label style={styles.label}>
+              Expected Attendees
+              <input
+                style={styles.input}
+                type="number"
+                min="0"
+                value={form.expected_attendees}
+                onChange={(e) =>
+                  setForm({ ...form, expected_attendees: e.target.value })
+                }
+              />
+            </label>
+
+            <button type="submit" disabled={loading} style={styles.button}>
+              {loading ? "Creating..." : "Create Session"}
+            </button>
+          </form>
+        </section>
+      )}
+
+      <section style={styles.section}>
+        <h2 style={styles.sectionTitle}>View Conference Agenda</h2>
+
+        <form onSubmit={handleLoadAgenda} style={styles.agendaForm}>
+          <label style={styles.label}>
+            Conference
+            <input
+              style={styles.input}
+              list="agenda-conferences"
+              value={conferenceSearch}
+              onChange={(e) => selectConference(e.target.value, "agenda")}
+              placeholder="Search conference by name"
+              required
+            />
+            <datalist id="agenda-conferences">
+              {conferences.map((c) => (
+                <option
+                  key={c.id}
+                  value={c.name || c.title || `Conference ${c.id}`}
+                />
+              ))}
+            </datalist>
+          </label>
+
+          <button type="submit" style={styles.secondaryButton}>
+            Load Agenda
+          </button>
+        </form>
+
+        {agenda && (
+          <div style={styles.agenda}>
+            <h3 style={styles.agendaTitle}>{agenda.conference.name}</h3>
+
+            {sessions.length === 0 ? (
+              <p style={styles.muted}>No sessions found.</p>
+            ) : (
+              <ol style={styles.sessionList}>
+                {sessions.map((session) => (
+                  <li key={session.id} style={styles.sessionItem}>
+                    <strong style={styles.sessionTitle}>{session.title}</strong>
+
+                    <p style={styles.sessionMeta}>
+                      {session.start_time} - {session.end_time}
+                    </p>
+
+                    <p style={styles.sessionMeta}>
+                      Room: {session.location} · Capacity: {session.room_capacity}
+                      {" · "}Expected: {session.expected_attendees ?? "N/A"}
+                    </p>
+
+                    <p style={styles.sessionMeta}>
+                      Speaker: {speakerName(session.speaker_id)}
+                    </p>
+
+                    {isOrganizer && (
+                      <div style={styles.assignForm}>
+                        <input
+                          aria-label={`Search speaker for ${session.title}`}
+                          style={styles.input}
+                          list={`assign-speakers-${session.id}`}
+                          placeholder="Search speaker by name"
+                          value={assignSpeakerSearch[session.id] || ""}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            const selected = speakers.find(
+                              (sp) =>
+                                (sp.name || sp.username || sp.email ||
+                                  `Speaker ${sp.id}`) === value
+                            );
+
+                            setAssignSpeakerSearch((prev) => ({
+                              ...prev,
+                              [session.id]: value,
+                            }));
+
+                            setAssignSpeakerIds((prev) => ({
+                              ...prev,
+                              [session.id]: selected ? String(selected.id) : "",
+                            }));
+                          }}
+                        />
+
+                        <datalist id={`assign-speakers-${session.id}`}>
+                          {speakers.map((sp) => (
+                            <option
+                              key={sp.id}
+                              value={sp.name || sp.username || sp.email || `Speaker ${sp.id}`}
+                            />
+                          ))}
+                        </datalist>
+
+                        <button
+                          type="button"
+                          style={styles.secondaryButton}
+                          onClick={() => assignSpeaker(session.id)}
+                        >
+                          Assign Speaker
+                        </button>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
+
+const styles: Record<string, React.CSSProperties> = {
+  page: {
+    width: "100%",
+    maxWidth: 1100,
+    margin: "0 auto",
+    padding: "12px 0 40px",
+  },
+  header: { marginBottom: 24 },
+  eyebrow: {
+    margin: "0 0 6px",
+    color: "#67e8f9",
+    fontSize: 12,
+    fontWeight: 800,
+    textTransform: "uppercase",
+    letterSpacing: "0.12em",
+  },
+  title: { margin: 0, color: "#f8fafc", fontSize: 34 },
+  section: {
+    marginTop: 18,
+    padding: 26,
+    border: "1px solid rgba(148,163,184,0.2)",
+    borderRadius: 14,
+    background: "linear-gradient(145deg, rgba(15,23,42,0.96), rgba(30,41,59,0.88))",
+    boxShadow: "0 16px 32px rgba(2,6,23,0.22)",
+  },
+  sectionTitle: { margin: "0 0 22px", color: "#f8fafc", fontSize: 22 },
+  form: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 270px), 1fr))",
+    gap: 20,
+  },
+  label: {
+    display: "grid",
+    alignContent: "start",
+    gap: 9,
+    color: "#dbeafe",
+    fontSize: 15,
+    fontWeight: 700,
+  },
+  input: {
+    width: "100%",
+    minWidth: 0,
+    minHeight: 54,
+    padding: "13px 15px",
+    color: "#f8fafc",
+    background: "#0b1220",
+    border: "1px solid #475569",
+    borderRadius: 8,
+    fontSize: 16,
+    boxSizing: "border-box",
+  },
+  button: {
+    gridColumn: "1 / -1",
+    justifySelf: "start",
+    minHeight: 52,
+    padding: "13px 22px",
+    border: 0,
+    borderRadius: 8,
+    background: "#0e7490",
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: 800,
+    cursor: "pointer",
+  },
+  secondaryButton: {
+    minHeight: 52,
+    padding: "13px 20px",
+    border: "1px solid #64748b",
+    borderRadius: 8,
+    background: "#1e293b",
+    color: "#f8fafc",
+    fontSize: 15,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  agendaForm: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "end",
+    gap: 14,
+  },
+  agenda: { marginTop: 24 },
+  agendaTitle: { color: "#f8fafc", fontSize: 20 },
+  sessionList: { display: "grid", gap: 14, paddingLeft: 24 },
+  sessionItem: {
+    padding: 18,
+    color: "#e2e8f0",
+    background: "rgba(2,6,23,0.38)",
+    border: "1px solid rgba(148,163,184,0.14)",
+    borderRadius: 8,
+  },
+  sessionTitle: { color: "#f8fafc", fontSize: 18 },
+  sessionMeta: {
+    margin: "8px 0 0",
+    color: "#cbd5e1",
+    overflowWrap: "anywhere",
+  },
+  assignForm: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 12,
+    marginTop: 16,
+  },
+  muted: { color: "#cbd5e1" },
+  error: {
+    padding: "12px 16px",
+    color: "#fecaca",
+    background: "rgba(127,29,29,0.24)",
+    border: "1px solid rgba(248,113,113,0.25)",
+    borderRadius: 8,
+  },
+};
+
+export default SessionsPage;

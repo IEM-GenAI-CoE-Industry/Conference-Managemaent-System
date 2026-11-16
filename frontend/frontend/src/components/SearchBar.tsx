@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 
 export type SearchType = 'Conference' | 'Session' | 'Speaker';
 
@@ -9,6 +10,8 @@ interface SearchBarProps {
 export function SearchBar({ onSearch }: SearchBarProps) {
   const [query, setQuery] = useState<string>('');
   const [type, setType] = useState<SearchType>('Conference');
+  const location = useLocation();
+  useEffect(() => { setQuery(''); }, [location.pathname]);
 
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -61,6 +64,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
         type="text"
         placeholder="Search directory..."
         value={query}
+        aria-label="Search conferences, sessions, or speakers"
         onChange={(e) => setQuery(e.target.value)}
         style={{
           flex: 1,

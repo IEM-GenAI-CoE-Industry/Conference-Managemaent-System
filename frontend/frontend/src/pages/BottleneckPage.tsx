@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import api from "../api";
 
@@ -17,10 +18,25 @@ type Conference = {
 
 const severityOrder: Severity[] = ["critical", "warning", "info"];
 
-const severityStyles: Record<Severity, { color: string; background: string; label: string }> = {
-  critical: { color: "#fecaca", background: "rgba(185,28,28,0.18)", label: "Critical" },
-  warning: { color: "#fde68a", background: "rgba(180,83,9,0.2)", label: "Warning" },
-  info: { color: "#bae6fd", background: "rgba(3,105,161,0.2)", label: "Information" },
+const severityStyles: Record<
+  Severity,
+  { color: string; background: string; label: string }
+> = {
+  critical: {
+    color: "#fecaca",
+    background: "rgba(185,28,28,0.18)",
+    label: "Critical",
+  },
+  warning: {
+    color: "#fde68a",
+    background: "rgba(180,83,9,0.2)",
+    label: "Warning",
+  },
+  info: {
+    color: "#bae6fd",
+    background: "rgba(3,105,161,0.2)",
+    label: "Information",
+  },
 };
 
 function recommendedAction(category: string): string {
@@ -41,21 +57,24 @@ function recommendedAction(category: string): string {
 }
 
 function affectedLabel(category: string, count: number): string {
-  const unit = category === "capacity" || category === "attendance"
-    ? "session"
-    : category === "reviews"
-      ? "paper"
-      : category === "speakers"
-        ? "speaker confirmation"
-        : category === "payments"
-          ? "payment"
-          : "item";
+  const unit =
+    category === "capacity" || category === "attendance"
+      ? "session"
+      : category === "reviews"
+        ? "paper"
+        : category === "speakers"
+          ? "speaker confirmation"
+          : category === "payments"
+            ? "payment"
+            : "item";
+
   return `${count} ${unit}${count === 1 ? "" : "s"} affected`;
 }
 
 export default function BottleneckPage() {
   const [conferences, setConferences] = useState<Conference[]>([]);
   const [conferenceId, setConferenceId] = useState("");
+  const [conferenceSearch, setConferenceSearch] = useState("");
   const [alerts, setAlerts] = useState<BottleneckAlert[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -64,14 +83,19 @@ export default function BottleneckPage() {
   async function loadAlerts(id: number) {
     setLoading(true);
     setError("");
+
     try {
       const response = await api.get<BottleneckAlert[]>("/bottlenecks", {
         params: { conference_id: id },
       });
+
       setAlerts(response.data);
       setLastUpdated(new Date());
     } catch (exception: any) {
-      setError(exception.response?.data?.detail || "Unable to load bottlenecks.");
+      setError(
+        exception.response?.data?.detail ||
+          "Unable to load bottlenecks."
+      );
       setAlerts([]);
     } finally {
       setLoading(false);
@@ -82,19 +106,60 @@ export default function BottleneckPage() {
     async function loadConferences() {
       try {
         const response = await api.get<Conference[]>("/conferences/");
-        setConferences(response.data);
-        const firstConference = response.data[0];
-        if (firstConference) {
-          setConferenceId(String(firstConference.id));
-          await loadAlerts(firstConference.id);
+        const list: Conference[] = response.data ?? [];
+
+        setConferences(list);
+
+        const savedId = localStorage.getItem("selected_conference_id");
+        const selectedConference =
+          list.find((conference) => String(conference.id) === savedId) ||
+          list[0];
+
+        if (selectedConference) {
+          const id = String(selectedConference.id);
+
+          setConferenceId(id);
+          setConferenceSearch(selectedConference.name);
+
+          localStorage.setItem("selected_conference_id", id);
+
+          await loadAlerts(selectedConference.id);
+        } else {
+          setConferenceId("");
+          setConferenceSearch("");
+          setAlerts([]);
         }
       } catch (exception: any) {
-        setError(exception.response?.data?.detail || "Unable to load conferences.");
+        setError(
+          exception.response?.data?.detail ||
+            "Unable to load conferences."
+        );
       }
     }
 
     loadConferences();
   }, []);
+
+  function handleConferenceSearch(value: string) {
+    setConferenceSearch(value);
+
+    const selected = conferences.find(
+      (conference) =>
+        conference.name.toLowerCase() === value.trim().toLowerCase()
+    );
+
+    if (selected) {
+      setConferenceId(String(selected.id));
+      localStorage.setItem(
+        "selected_conference_id",
+        String(selected.id)
+      );
+      loadAlerts(selected.id);
+    } else {
+      setConferenceId("");
+      setAlerts([]);
+    }
+  }
 
   const severityCounts = severityOrder.map((severity) => ({
     severity,
@@ -107,30 +172,44 @@ export default function BottleneckPage() {
         <div>
           <p style={styles.eyebrow}>Operations monitoring</p>
           <h1 style={styles.title}>Bottleneck Detector</h1>
-          <p style={styles.subtitle}>Issues that may delay or disrupt conference operations.</p>
+          <p style={styles.subtitle}>
+            Issues that may delay or disrupt conference operations.
+          </p>
         </div>
+
         <div style={styles.controls}>
           <label style={styles.selectLabel}>
             Conference
-            <select
-              value={conferenceId}
-              onChange={(event) => {
-                const id = event.target.value;
-                setConferenceId(id);
-                if (id) loadAlerts(Number(id));
-              }}
+
+            <input
+              type="text"
+              list="bottleneck-conferences"
+              value={conferenceSearch}
+              onChange={(event) =>
+                handleConferenceSearch(event.target.value)
+              }
+              placeholder="Search conference by name"
               disabled={conferences.length === 0 || loading}
               style={styles.select}
-            >
-              {conferences.length === 0 && <option value="">No conferences</option>}
+            />
+
+            <datalist id="bottleneck-conferences">
               {conferences.map((conference) => (
-                <option key={conference.id} value={conference.id}>{conference.name}</option>
+                <option
+                  key={conference.id}
+                  value={conference.name}
+                />
               ))}
-            </select>
+            </datalist>
           </label>
+
           <button
             type="button"
-            onClick={() => conferenceId && loadAlerts(Number(conferenceId))}
+            onClick={() => {
+              if (conferenceId) {
+                loadAlerts(Number(conferenceId));
+              }
+            }}
             disabled={!conferenceId || loading}
             style={styles.refreshButton}
           >
@@ -139,17 +218,46 @@ export default function BottleneckPage() {
         </div>
       </header>
 
-      {error && <p role="alert" style={styles.error}>{error}</p>}
+      {error && (
+        <p role="alert" style={styles.error}>
+          {error}
+        </p>
+      )}
 
       <section aria-label="Alert totals" style={styles.summaryGrid}>
         {severityCounts.map(({ severity, count }) => (
-          <div key={severity} style={{ ...styles.summaryCard, borderTop: `3px solid ${severityStyles[severity].color}` }}>
-            <span style={styles.summaryLabel}>{severityStyles[severity].label}</span>
-            <strong style={{ ...styles.summaryValue, color: severityStyles[severity].color }}>{count}</strong>
-            <span style={styles.summaryCaption}>{count === 1 ? "open alert" : "open alerts"}</span>
+          <div
+            key={severity}
+            style={{
+              ...styles.summaryCard,
+              borderTop: `3px solid ${severityStyles[severity].color}`,
+            }}
+          >
+            <span style={styles.summaryLabel}>
+              {severityStyles[severity].label}
+            </span>
+
+            <strong
+              style={{
+                ...styles.summaryValue,
+                color: severityStyles[severity].color,
+              }}
+            >
+              {count}
+            </strong>
+
+            <span style={styles.summaryCaption}>
+              {count === 1 ? "open alert" : "open alerts"}
+            </span>
           </div>
         ))}
-        <div style={{ ...styles.summaryCard, borderTop: "3px solid #94a3b8" }}>
+
+        <div
+          style={{
+            ...styles.summaryCard,
+            borderTop: "3px solid #94a3b8",
+          }}
+        >
           <span style={styles.summaryLabel}>Total</span>
           <strong style={styles.totalValue}>{alerts.length}</strong>
           <span style={styles.summaryCaption}>open alerts</span>
@@ -159,26 +267,64 @@ export default function BottleneckPage() {
       <section style={styles.alertSection}>
         <div style={styles.sectionHeader}>
           <h2 style={styles.sectionTitle}>Open issues</h2>
-          {lastUpdated && <span style={styles.updated}>Updated {lastUpdated.toLocaleTimeString()}</span>}
+
+          {lastUpdated && (
+            <span style={styles.updated}>
+              Updated {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
         </div>
 
         {loading && alerts.length === 0 ? (
-          <p style={styles.emptyState}>Checking conference operations...</p>
+          <p style={styles.emptyState}>
+            Checking conference operations...
+          </p>
         ) : alerts.length > 0 ? (
           <div style={styles.alertList}>
             {alerts.map((alert, index) => {
-              const severity = severityStyles[alert.severity] ?? severityStyles.info;
+              const severity =
+                severityStyles[alert.severity] ?? severityStyles.info;
+
               return (
-                <article key={`${alert.category}-${index}`} style={{ ...styles.alertCard, borderLeft: `4px solid ${severity.color}` }}>
+                <article
+                  key={`${alert.category}-${index}`}
+                  style={{
+                    ...styles.alertCard,
+                    borderLeft: `4px solid ${severity.color}`,
+                  }}
+                >
                   <div style={styles.alertHeading}>
-                    <span style={{ ...styles.badge, color: severity.color, background: severity.background }}>{severity.label}</span>
-                    <span style={styles.category}>{alert.category}</span>
-                    <span style={styles.affected}>{affectedLabel(alert.category, alert.count)}</span>
+                    <span
+                      style={{
+                        ...styles.badge,
+                        color: severity.color,
+                        background: severity.background,
+                      }}
+                    >
+                      {severity.label}
+                    </span>
+
+                    <span style={styles.category}>
+                      {alert.category}
+                    </span>
+
+                    <span style={styles.affected}>
+                      {affectedLabel(alert.category, alert.count)}
+                    </span>
                   </div>
-                  <p style={styles.alertMessage}>{alert.message}</p>
+
+                  <p style={styles.alertMessage}>
+                    {alert.message}
+                  </p>
+
                   <div style={styles.actionBox}>
-                    <strong style={styles.actionLabel}>Recommended next step</strong>
-                    <p style={styles.actionText}>{recommendedAction(alert.category)}</p>
+                    <strong style={styles.actionLabel}>
+                      Recommended next step
+                    </strong>
+
+                    <p style={styles.actionText}>
+                      {recommendedAction(alert.category)}
+                    </p>
                   </div>
                 </article>
               );
@@ -187,7 +333,9 @@ export default function BottleneckPage() {
         ) : (
           <div style={styles.clearState}>
             <strong>No active bottlenecks</strong>
-            <p>There are no flagged operational issues for this conference right now.</p>
+            <p>
+              There are no flagged operational issues for this conference right now.
+            </p>
           </div>
         )}
       </section>
@@ -196,36 +344,223 @@ export default function BottleneckPage() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: { width: "100%", maxWidth: 1100, margin: "0 auto", padding: "12px 0 40px" },
-  header: { display: "flex", justifyContent: "space-between", alignItems: "end", flexWrap: "wrap", gap: 22, marginBottom: 28 },
-  eyebrow: { margin: "0 0 6px", color: "#67e8f9", fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em" },
-  title: { margin: 0, color: "#f8fafc", fontSize: 34 },
-  subtitle: { margin: "8px 0 0", color: "#cbd5e1" },
-  controls: { display: "flex", alignItems: "end", flexWrap: "wrap", gap: 12 },
-  selectLabel: { display: "grid", gap: 7, color: "#cbd5e1", fontSize: 13, fontWeight: 700 },
-  select: { minWidth: 240, maxWidth: "min(380px, 70vw)", minHeight: 44, padding: "9px 12px", border: "1px solid #475569", borderRadius: 8, background: "#0b1220", color: "#f8fafc", fontSize: 14 },
-  refreshButton: { minHeight: 44, padding: "10px 18px", border: "1px solid rgba(103,232,249,0.35)", borderRadius: 8, background: "#0e7490", color: "#fff", fontWeight: 800, cursor: "pointer" },
-  summaryGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14 },
-  summaryCard: { display: "grid", gap: 4, padding: "16px 18px", border: "1px solid rgba(148,163,184,0.18)", borderRadius: 10, background: "rgba(15,23,42,0.76)" },
-  summaryLabel: { color: "#cbd5e1", fontSize: 13, fontWeight: 700 },
-  summaryValue: { fontSize: 30, lineHeight: 1.15 },
-  totalValue: { color: "#f8fafc", fontSize: 30, lineHeight: 1.15 },
-  summaryCaption: { color: "#94a3b8", fontSize: 12 },
-  alertSection: { marginTop: 28 },
-  sectionHeader: { display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 12, marginBottom: 14 },
-  sectionTitle: { margin: 0, color: "#f8fafc", fontSize: 21 },
-  updated: { color: "#94a3b8", fontSize: 12 },
-  alertList: { display: "grid", gap: 14 },
-  alertCard: { padding: "18px 20px", border: "1px solid rgba(148,163,184,0.18)", borderRadius: 10, background: "linear-gradient(145deg, rgba(15,23,42,0.94), rgba(30,41,59,0.8))" },
-  alertHeading: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 },
-  badge: { padding: "5px 9px", borderRadius: 6, fontSize: 12, fontWeight: 800 },
-  category: { color: "#cbd5e1", fontSize: 13, textTransform: "capitalize" },
-  affected: { marginLeft: "auto", color: "#94a3b8", fontSize: 13 },
-  alertMessage: { margin: "14px 0", color: "#f8fafc", fontSize: 17, fontWeight: 700 },
-  actionBox: { padding: "12px 14px", borderRadius: 8, background: "rgba(2,6,23,0.36)" },
-  actionLabel: { color: "#a5f3fc", fontSize: 12, textTransform: "uppercase" },
-  actionText: { margin: "5px 0 0", color: "#cbd5e1", lineHeight: 1.5 },
-  error: { padding: "12px 16px", color: "#fecaca", background: "rgba(127,29,29,0.24)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: 8 },
-  emptyState: { padding: "20px 0", color: "#cbd5e1" },
-  clearState: { padding: "24px", border: "1px solid rgba(45,212,191,0.25)", borderRadius: 10, background: "rgba(13,148,136,0.1)", color: "#ccfbf1" },
+  page: {
+    width: "100%",
+    maxWidth: 1100,
+    margin: "0 auto",
+    padding: "12px 0 40px",
+  },
+
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "end",
+    flexWrap: "wrap",
+    gap: 22,
+    marginBottom: 28,
+  },
+
+  eyebrow: {
+    margin: "0 0 6px",
+    color: "#67e8f9",
+    fontSize: 12,
+    fontWeight: 800,
+    textTransform: "uppercase",
+    letterSpacing: "0.12em",
+  },
+
+  title: {
+    margin: 0,
+    color: "#f8fafc",
+    fontSize: 34,
+  },
+
+  subtitle: {
+    margin: "8px 0 0",
+    color: "#cbd5e1",
+  },
+
+  controls: {
+    display: "flex",
+    alignItems: "end",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+
+  selectLabel: {
+    display: "grid",
+    gap: 7,
+    color: "#cbd5e1",
+    fontSize: 13,
+    fontWeight: 700,
+  },
+
+  select: {
+    minWidth: 240,
+    maxWidth: "min(380px, 70vw)",
+    minHeight: 44,
+    padding: "9px 12px",
+    border: "1px solid #475569",
+    borderRadius: 8,
+    background: "#0b1220",
+    color: "#f8fafc",
+    fontSize: 14,
+  },
+
+  refreshButton: {
+    minHeight: 44,
+    padding: "10px 18px",
+    border: "1px solid rgba(103,232,249,0.35)",
+    borderRadius: 8,
+    background: "#0e7490",
+    color: "#fff",
+    fontWeight: 800,
+    cursor: "pointer",
+  },
+
+  summaryGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+    gap: 14,
+  },
+
+  summaryCard: {
+    display: "grid",
+    gap: 4,
+    padding: "16px 18px",
+    border: "1px solid rgba(148,163,184,0.18)",
+    borderRadius: 10,
+    background: "rgba(15,23,42,0.76)",
+  },
+
+  summaryLabel: {
+    color: "#cbd5e1",
+    fontSize: 13,
+    fontWeight: 700,
+  },
+
+  summaryValue: {
+    fontSize: 30,
+    lineHeight: 1.15,
+  },
+
+  totalValue: {
+    color: "#f8fafc",
+    fontSize: 30,
+    lineHeight: 1.15,
+  },
+
+  summaryCaption: {
+    color: "#94a3b8",
+    fontSize: 12,
+  },
+
+  alertSection: {
+    marginTop: 28,
+  },
+
+  sectionHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 14,
+  },
+
+  sectionTitle: {
+    margin: 0,
+    color: "#f8fafc",
+    fontSize: 21,
+  },
+
+  updated: {
+    color: "#94a3b8",
+    fontSize: 12,
+  },
+
+  alertList: {
+    display: "grid",
+    gap: 14,
+  },
+
+  alertCard: {
+    padding: "18px 20px",
+    border: "1px solid rgba(148,163,184,0.18)",
+    borderRadius: 10,
+    background:
+      "linear-gradient(145deg, rgba(15,23,42,0.94), rgba(30,41,59,0.8))",
+  },
+
+  alertHeading: {
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+
+  badge: {
+    padding: "5px 9px",
+    borderRadius: 6,
+    fontSize: 12,
+    fontWeight: 800,
+  },
+
+  category: {
+    color: "#cbd5e1",
+    fontSize: 13,
+    textTransform: "capitalize",
+  },
+
+  affected: {
+    marginLeft: "auto",
+    color: "#94a3b8",
+    fontSize: 13,
+  },
+
+  alertMessage: {
+    margin: "14px 0",
+    color: "#f8fafc",
+    fontSize: 17,
+    fontWeight: 700,
+  },
+
+  actionBox: {
+    padding: "12px 14px",
+    borderRadius: 8,
+    background: "rgba(2,6,23,0.36)",
+  },
+
+  actionLabel: {
+    color: "#a5f3fc",
+    fontSize: 12,
+    textTransform: "uppercase",
+  },
+
+  actionText: {
+    margin: "5px 0 0",
+    color: "#cbd5e1",
+    lineHeight: 1.5,
+  },
+
+  error: {
+    padding: "12px 16px",
+    color: "#fecaca",
+    background: "rgba(127,29,29,0.24)",
+    border: "1px solid rgba(248,113,113,0.25)",
+    borderRadius: 8,
+  },
+
+  emptyState: {
+    padding: "20px 0",
+    color: "#cbd5e1",
+  },
+
+  clearState: {
+    padding: 24,
+    border: "1px solid rgba(45,212,191,0.25)",
+    borderRadius: 10,
+    background: "rgba(13,148,136,0.1)",
+    color: "#ccfbf1",
+  },
 };

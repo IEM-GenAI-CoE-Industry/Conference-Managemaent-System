@@ -39,6 +39,15 @@ def run():
     assert speaker_dir.status_code == 200, speaker_dir.text
     assert isinstance(speaker_dir.json(), list) and len(speaker_dir.json()) >= 1
 
+    # Direct API role-enforcement checks (not just frontend route visibility).
+    # Organizer-only directories must reject anonymous and participant requests.
+    assert client.get("/users/reviewers").status_code == 401
+    assert client.get("/users/reviewers", headers=participant).status_code == 403
+    assert client.get("/users/speakers").status_code == 401
+    assert client.get("/users/speakers", headers=participant).status_code == 403
+    assert client.get("/resources/forecast?conference_id=1", headers=participant).status_code == 403
+    assert client.post("/resources/forecast/config?conference_id=1", headers=participant, json={"attendance_rate_percent": 75}).status_code == 403
+
     checks = [
         ("/auth/me", organizer),
         ("/conferences/", None),
@@ -80,7 +89,7 @@ def run():
     # Forecast configuration is organizer-only and is reflected immediately.
     r = client.post("/resources/forecast/config?conference_id=1", headers=organizer, json={"attendance_rate_percent": 80})
     assert r.status_code == 200, r.text
-    r = client.get("/resources/forecast?conference_id=1")
+    r = client.get("/resources/forecast?conference_id=1", headers=organizer)
     assert r.status_code == 200 and r.json()["attendance_rate_percent"] == 80, r.text
 
     # Leave the documented demo login exactly as it was found.
